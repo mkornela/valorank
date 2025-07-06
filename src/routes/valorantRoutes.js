@@ -5,7 +5,7 @@ const config = require('../config');
 const { VALID_REGIONS, RANK_TIERS } = require('../constants');
 const { logToDiscord } = require('../utils/discord');
 const { getSessionTimeRange } = require('../utils/time');
-const { fetchFromHenrikApi, fetchAccountDetails, fetchMatchHistory, fetchPlayerMMR, fetchLeaderboard, fetchMMRHistory } = require('../services/api');
+const { fetchFromHenrikApi, fetchAccountDetails, fetchMatchHistory, fetchPlayerMMR, fetchLeaderboard, fetchMMRHistory, fetchMMRHistoryDaily } = require('../services/api');
 const { findPlayerByRank } = require('../data/leaderboard');
 const { calculateRRToGoal, calculateSessionStats } = require('../services/game');
 const log = require('../utils/logger');
@@ -64,6 +64,7 @@ router.get('/rank/:name/:tag/:region', async (req, res) => {
     }
 });
 
+
 router.get('/wl/:name/:tag/:region', async (req, res) => {
     const { name, tag, region } = req.params;
     const { resetTime, sessionStart } = req.query;
@@ -74,44 +75,39 @@ router.get('/wl/:name/:tag/:region', async (req, res) => {
     }
     
     try {
-        const [account, history] = await Promise.all([
+        const [account, history, mmrHistory] = await Promise.all([
             fetchAccountDetails(name, tag), 
-            fetchMatchHistory(name, tag, region, 'competitive', 20)
+            fetchMatchHistory(name, tag, region, 'competitive', 20),
+            fetchMMRHistory(name, tag, region) // Używa v1
         ]);
         
-        if (!account.data || !account.data.puuid) {
+        if (!account.data?.puuid) {
             res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza.');
-            return logToDiscord({ title: 'API Call Failed: `/wl`', color: 0xFFA500, description: 'Player not found.', fields: [{ name: 'Player', value: `\`${name}#${tag}\``, inline: true }, { name: 'Region', value: region.toUpperCase(), inline: true }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } }, true);
+            return logToDiscord({ title: 'API Call Failed: `/wl`', color: 0xFFA500, description: 'Player not found.', fields: [{ name: 'Player', value: `\`${name}#${tag}\``, inline: true }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } }, true);
         }
         
+        const mmrHistoryArray = mmrHistory?.data || [];
         let wins = 0, losses = 0, draws = 0;
         
         if (sessionStart) {
             const sessionStartTimestamp = parseInt(sessionStart, 10);
-            if (isNaN(sessionStartTimestamp) || sessionStartTimestamp <= 0) {
-                return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy format czasu rozpoczęcia sesji (musi być w sekundach unix).');
-            }
-            const { wins: sWins, losses: sLosses, draws: sDraws } = calculateSessionStats(history, account.data.puuid, new Date(sessionStartTimestamp * 1000), new Date());
-            wins = sWins; losses = sLosses; draws = sDraws;
+            if (isNaN(sessionStartTimestamp) || sessionStartTimestamp <= 0) return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy format czasu rozpoczęcia sesji.');
+            ({ wins, losses, draws } = calculateSessionStats(history, mmrHistoryArray, account.data.puuid, new Date(sessionStartTimestamp * 1000), new Date()));
         } else {
             const { startTime, endTime } = getSessionTimeRange(req.query.since ? parseInt(req.query.since, 10) : null, resetTime);
-            const { wins: sWins, losses: sLosses, draws: sDraws } = calculateSessionStats(history, account.data.puuid, startTime, endTime);
-            wins = sWins; losses = sLosses; draws = sDraws;
+            ({ wins, losses, draws } = calculateSessionStats(history, mmrHistoryArray, account.data.puuid, startTime, endTime));
         }
         
         const result = draws > 0 ? `${wins}W/${draws}D/${losses}L` : `${wins}W/${losses}L`;
         res.type('text/plain').send(result);
         
-        const logFields = [{ name: 'Player', value: `\`${name}#${tag}\``, inline: true }, { name: 'Region', value: region.toUpperCase(), inline: true }, { name: 'Result', value: `\`${result}\``, inline: false }];
-        if (resetTime) logFields.push({ name: 'Reset Time', value: `\`${resetTime}\``, inline: true });
-        if (sessionStart) logFields.push({ name: 'Session Start', value: `\`${new Date(parseInt(sessionStart) * 1000).toISOString()}\``, inline: true });
+        const logFields = [{ name: 'Player', value: `\`${name}#${tag}\``, inline: true }, { name: 'Result', value: `\`${result}\``, inline: false }];
         logToDiscord({ title: 'API Call Success: `/wl`', color: 0x00FF00, fields: logFields, timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
         
     } catch (error) {
         log.error('ROUTES', `Error in /wl endpoint: ${error.message}`);
-        const errorMessage = error.message.includes('Invalid resetTime') ? 'Błąd: ' + error.message : 'Błąd: API jest niedostępne.';
-        res.status(500).type('text/plain').send(errorMessage);
-        logToDiscord({ title: 'API Error: `/wl`', color: 0xFF0000, description: `\`\`\`${error.message}\`\`\``, fields: [{ name: 'Player', value: `\`${name}#${tag}\``, inline: true }, { name: 'Region', value: region.toUpperCase(), inline: true }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } }, true);
+        res.status(500).type('text/plain').send('Błąd: API jest niedostępne.');
+        logToDiscord({ title: 'API Error: `/wl`', color: 0xFF0000, description: `\`\`\`${error.message}\`\`\``, fields: [{ name: 'Player', value: `\`${name}#${tag}\`` }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } }, true);
     }
 });
 
@@ -121,44 +117,98 @@ router.get('/advanced_wl/:name/:tag/:region', async (req, res) => {
     
     if (!VALID_REGIONS.includes(region.toLowerCase())) {
         res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
-        return logToDiscord({ title: 'API Call Failed: `/advanced_wl`', color: 0xFFA500, description: 'Invalid region provided.', fields: [{ name: 'Player', value: `\`${name}#${tag}\``, inline: true }, { name: 'Provided Region', value: `\`${region}\``, inline: true }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } }, true);
+        return logToDiscord({ title: 'API Call Failed: `/advanced_wl`', color: 0xFFA500, description: 'Invalid region provided.', fields: [{ name: 'Player', value: `\`${name}#${tag}\``}], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } }, true);
     }
     
     try {
-        const [account, history, mmrHistory] = await Promise.all([ fetchAccountDetails(name, tag), fetchMatchHistory(name, tag, region, 'competitive', 25), fetchMMRHistory(name, tag, region) ]);
+        const [account, history, mmrHistory] = await Promise.all([ 
+            fetchAccountDetails(name, tag), 
+            fetchMatchHistory(name, tag, region, 'competitive', 25), 
+            fetchMMRHistory(name, tag, region) // Używa v1
+        ]);
         
-        if (!account.data || !account.data.puuid) {
+        if (!account.data?.puuid) {
             res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza.');
-            return logToDiscord({ title: 'API Call Failed: `/advanced_wl`', color: 0xFFA500, description: 'Player not found.', fields: [{ name: 'Player', value: `\`${name}#${tag}\``, inline: true }, { name: 'Region', value: region.toUpperCase(), inline: true }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } }, true);
+            return logToDiscord({ title: 'API Call Failed: `/advanced_wl`', color: 0xFFA500, description: 'Player not found.', fields: [{ name: 'Player', value: `\`${name}#${tag}\`` }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } }, true);
         }
         
         const { startTime, endTime } = getSessionTimeRange(req.query.since ? parseInt(req.query.since, 10) : null, resetTime);
-        let { wins, losses, draws, lastMatchResult, lastMatchRR } = calculateSessionStats(history, account.data.puuid, startTime, endTime);
-        
-        if (lastMatchRR === null && mmrHistory.data && mmrHistory.data.length > 0) {
-            const latestMMR = mmrHistory.data[0];
-            if (latestMMR.mmr_change_to_last_game !== undefined) {
-                lastMatchRR = latestMMR.mmr_change_to_last_game;
-            }
-        }
+        const mmrHistoryArray = mmrHistory?.data || [];
+        let { wins, losses, draws, lastMatchResult, lastMatchRR } = calculateSessionStats(history, mmrHistoryArray, account.data.puuid, startTime, endTime);
         
         let result = draws > 0 ? `${wins}W/${draws}D/${losses}L` : `${wins}W/${losses}L`;
         if (lastMatchResult) {
-            result += ` (Last:`; //${lastMatchResult} removed
+            result += ` (Last:`;
             if (lastMatchRR != null) { result += ` ${lastMatchRR >= 0 ? '+' : ''}${lastMatchRR}RR`; }
             result += ')';
         }
         res.type('text/plain').send(result);
 
-        const logFields = [{ name: 'Player', value: `\`${name}#${tag}\``, inline: true }, { name: 'Region', value: region.toUpperCase(), inline: true }, { name: 'Result', value: `\`${result}\``, inline: false }];
-        if (resetTime) logFields.push({ name: 'Reset Time', value: `\`${resetTime}\``, inline: true });
+        const logFields = [{ name: 'Player', value: `\`${name}#${tag}\``}, { name: 'Result', value: `\`result}\`` }];
         logToDiscord({ title: 'API Call Success: `/advanced_wl`', color: 0x00FF00, fields: logFields, timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
 
     } catch (error) {
         log.error('ROUTES', `Error in /advanced_wl endpoint: ${error.message}`);
-        const errorMessage = error.message.includes('Invalid resetTime') ? 'Błąd: ' + error.message : 'Błąd: API jest niedostępne.';
-        res.status(500).type('text/plain').send(errorMessage);
-        logToDiscord({ title: 'API Error: `/advanced_wl`', color: 0xFF0000, description: `\`\`\`${error.message}\`\`\``, fields: [{ name: 'Player', value: `\`${name}#${tag}\``, inline: true }, { name: 'Region', value: region.toUpperCase(), inline: true }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } }, true);
+        res.status(500).type('text/plain').send('Błąd: API jest niedostępne.');
+        logToDiscord({ title: 'API Error: `/advanced_wl`', color: 0xFF0000, description: `\`\`\`${error.message}\`\`\``, fields: [{ name: 'Player', value: `\`${name}#${tag}\``}], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } }, true);
+    }
+});
+
+router.get('/daily/:name/:tag/:region', async (req, res) => {
+    const { name, tag, region } = req.params;
+    const { resetTime } = req.query;
+
+    if (!VALID_REGIONS.includes(region.toLowerCase())) {
+        res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
+        return logToDiscord({ title: 'API Call Failed: `/daily`', color: 0xFFA500, description: 'Invalid region provided.', fields: [{ name: 'Player', value: `\`${name}#${tag}\`` }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } }, true);
+    }
+
+    try {
+        const [account, history, mmr, mmrHistory] = await Promise.all([
+            fetchAccountDetails(name, tag),
+            fetchMatchHistory(name, tag, region, 'competitive', 25),
+            fetchPlayerMMR(name, tag, region),
+            fetchMMRHistoryDaily(name, tag, region) // Używa v2
+        ]);
+        
+        if (!account.data?.puuid) {
+            res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza.');
+            return logToDiscord({ title: 'API Call Failed: `/daily`', color: 0xFFA500, description: 'Player not found.', fields: [{ name: 'Player', value: `\`${name}#${tag}\`` }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } }, true);
+        }
+
+        if (!mmr.data?.current_data) {
+            res.status(404).type('text/plain').send('Błąd: Brak danych rankingowych dla gracza.');
+            return logToDiscord({ title: 'API Call Failed: `/daily`', color: 0xFFA500, description: 'Player has no ranked data.', fields: [{ name: 'Player', value: `\`${name}#${tag}\`` }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } }, true);
+        }
+
+        const { startTime, endTime } = getSessionTimeRange(req.query.since ? parseInt(req.query.since, 10) : null, resetTime);
+        const mmrHistoryArray = mmrHistory?.data?.history || [];
+        let { wins, losses, draws, lastMatchRR, totalRRChange } = calculateSessionStats(history, mmrHistoryArray, account.data.puuid, startTime, endTime);
+        
+        const { currenttier, ranking_in_tier } = mmr.data.current_data;
+        const rankName = RANK_TIERS[currenttier] || "Brak Rangi";
+        
+        let wlString = draws > 0 ? `${wins}W/${draws}D/${losses}L` : `${wins}W/${losses}L`;
+        
+        let responseText = `${rankName} ${ranking_in_tier || 0}RR`;
+        responseText += ` | Bilans: ${wlString}`;
+
+        if (lastMatchRR !== null && (wins > 0 || losses > 0 || draws > 0)) {
+            responseText += ` | Last: ${lastMatchRR >= 0 ? '+' : ''}${lastMatchRR}RR`;
+        }
+        
+        const dailyRRFormatted = totalRRChange >= 0 ? `+${totalRRChange}` : totalRRChange;
+        responseText += ` | Dzisiaj: ${dailyRRFormatted}RR`;
+        
+        res.type('text/plain').send(responseText);
+
+        const logFields = [{ name: 'Player', value: `\`${name}#${tag}\`` }, { name: 'Result', value: `\`${responseText}\`` }];
+        logToDiscord({ title: 'API Call Success: `/daily`', color: 0x00FF00, fields: logFields, timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
+
+    } catch (error) {
+        log.error('ROUTES', `Error in /daily endpoint: ${error.message}`);
+        res.status(500).type('text/plain').send('Błąd: API jest niedostępne.');
+        logToDiscord({ title: 'API Error: `/daily`', color: 0xFF0000, description: `\`\`\`${error.message}\`\`\``, fields: [{ name: 'Player', value: `\`${name}#${tag}\`` }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } }, true);
     }
 });
 
@@ -200,5 +250,6 @@ router.get('/getrank/:position', async (req, res) => {
         logToDiscord({ title: 'API Error: `/getrank`', color: 0xFF0000, description: `\`\`\`${error.message}\`\`\``, fields: [{ name: 'Position', value: `\`${rankPosition}\``, inline: true }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } }, true);
     }
 });
+
 
 module.exports = router;

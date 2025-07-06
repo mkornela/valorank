@@ -61,6 +61,13 @@ async function fetchPlayerMMR(name, tag, region) {
     return fetchFromHenrikApi(`/valorant/v2/mmr/${region.toLowerCase()}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`); 
 }
 
+// Funkcja dla /daily, używa endpointu v2
+async function fetchMMRHistoryDaily(name, tag, region) {
+    const platform = 'pc';
+    return fetchFromHenrikApi(`/valorant/v2/mmr-history/${region.toLowerCase()}/${platform}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`);
+}
+
+// Funkcja dla /wl i /advanced_wl, używa endpointu v1
 async function fetchMMRHistory(name, tag, region) {
     return fetchFromHenrikApi(`/valorant/v1/mmr-history/${region.toLowerCase()}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`);
 }
@@ -117,6 +124,7 @@ module.exports = {
     fetchAccountDetails,
     fetchPlayerMMR,
     fetchMMRHistory,
+    fetchMMRHistoryDaily,
     fetchMatchHistory,
     fetchLeaderboard
 };
