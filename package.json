@@ -1,0 +1,26 @@
+{
+  "name": "valorant",
+  "version": "2.0.0",
+  "description": "A custom Valorant stats API and dashboard",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "docs": "node ./scripts/docsGenerator.js",
+    "stats": "node ./scripts/statsGenerator.js"
+  },
+  "author": "deemdll",
+  "license": "ISC",
+  "dependencies": {
+    "date-fns-tz": "^3.1.3",
+    "dayjs": "^1.11.13",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^3.3.2",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
