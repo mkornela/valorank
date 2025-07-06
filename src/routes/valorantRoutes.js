@@ -144,7 +144,7 @@ router.get('/advanced_wl/:name/:tag/:region', async (req, res) => {
         
         let result = draws > 0 ? `${wins}W/${draws}D/${losses}L` : `${wins}W/${losses}L`;
         if (lastMatchResult) {
-            result += ` (Last: `; //${lastMatchResult} removed
+            result += ` (Last:`; //${lastMatchResult} removed
             if (lastMatchRR != null) { result += ` ${lastMatchRR >= 0 ? '+' : ''}${lastMatchRR}RR`; }
             result += ')';
         }
