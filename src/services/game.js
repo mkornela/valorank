@@ -1,7 +1,7 @@
 const { RANK_TIERS, RADIANT_BASE_THRESHOLD } = require('../constants');
 const { getLeaderboardData } = require('../data/leaderboard'); 
 
-function calculateRRToGoal(currentTier, currentRR) {
+function calculateRRToGoal(currentTier, currentRR, liveLeaderboardPlayers = null) {
     if (currentTier === 27) { 
         return { rr: 0, goal: "Jesteś na szczycie!" }; 
     }
@@ -9,11 +9,10 @@ function calculateRRToGoal(currentTier, currentRR) {
     if (currentTier >= 26) { 
         let radiantRequiredRR = RADIANT_BASE_THRESHOLD;
         
-        const leaderboardData = getLeaderboardData();
-        const leaderboard = leaderboardData?.data?.players;
+        const players = liveLeaderboardPlayers || getLeaderboardData().data?.players;
 
-        if (leaderboard && leaderboard.length >= 500) {
-            const top500cutoff = (leaderboard[499]?.rankedRating || 0) + 1;
+        if (players && players.length >= 500) {
+            const top500cutoff = (players[499]?.rankedRating || 0) + 1;
             radiantRequiredRR = Math.max(RADIANT_BASE_THRESHOLD, top500cutoff);
         }
         

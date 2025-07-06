@@ -5,7 +5,7 @@ const config = require('../config');
 const { VALID_REGIONS, RANK_TIERS } = require('../constants');
 const { logToDiscord } = require('../utils/discord');
 const { getSessionTimeRange } = require('../utils/time');
-const { fetchFromHenrikApi, fetchAccountDetails, fetchMatchHistory, fetchPlayerMMR } = require('../services/api');
+const { fetchFromHenrikApi, fetchAccountDetails, fetchMatchHistory, fetchPlayerMMR, fetchLeaderboard } = require('../services/api');
 const { findPlayerByRank } = require('../data/leaderboard');
 const { calculateRRToGoal, calculateSessionStats } = require('../services/game');
 const log = require('../utils/logger');
@@ -39,14 +39,18 @@ router.get('/rank/:name/:tag/:region', async (req, res) => {
     }
 
     try {
-        const mmr = await fetchPlayerMMR(name, tag, region);
+        const [mmr, leaderboard] = await Promise.all([
+            fetchPlayerMMR(name, tag, region),
+            fetchLeaderboard(region)
+        ]);
+
         if (!mmr.data || !mmr.data.current_data) {
             logToDiscord({ title: 'API Call Failed: `/rank`', color: 0xFFA500, description: 'Player not found or has no ranked data.', fields: [{ name: 'Player', value: `\`${name}#${tag}\``, inline: true }, { name: 'Region', value: region.toUpperCase(), inline: true }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } }, true);
             return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza lub brak danych rankingowych.');
         }
 
         const { currenttier, ranking_in_tier } = mmr.data.current_data;
-        const { rr, goal } = calculateRRToGoal(currenttier, ranking_in_tier || 0);
+        const { rr, goal } = calculateRRToGoal(currenttier, ranking_in_tier || 0, leaderboard.data?.players);
         
         const finalText = text.replace(/{name}/g, name).replace(/{tag}/g, tag).replace(/{rank}/g, RANK_TIERS[currenttier] || "Unknown").replace(/{rr}/g, (ranking_in_tier || 0).toString()).replace(/{rrToGoal}/g, rr.toString()).replace(/{goal}/g, goal);
         

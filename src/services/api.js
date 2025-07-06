@@ -102,10 +102,16 @@ async function fetchMatchHistory(name, tag, region, gameMode = 'competitive', to
     }
 }
 
+async function fetchLeaderboard(region) {
+    log.info('API', `Fetching live leaderboard for region: ${region}`);
+    return fetchFromHenrikApi(`/valorant/v3/leaderboard/${region.toLowerCase()}/pc`);
+}
+
 module.exports = {
     initFetch,
     fetchFromHenrikApi,
     fetchAccountDetails,
     fetchPlayerMMR,
-    fetchMatchHistory
+    fetchMatchHistory,
+    fetchLeaderboard
 };
