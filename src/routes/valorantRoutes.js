@@ -5,7 +5,7 @@ const config = require('../config');
 const { VALID_REGIONS, RANK_TIERS } = require('../constants');
 const { logToDiscord } = require('../utils/discord');
 const { getSessionTimeRange } = require('../utils/time');
-const { fetchFromHenrikApi, fetchAccountDetails, fetchMatchHistory, fetchPlayerMMR, fetchLeaderboard } = require('../services/api');
+const { fetchFromHenrikApi, fetchAccountDetails, fetchMatchHistory, fetchPlayerMMR, fetchLeaderboard, fetchMMRHistory } = require('../services/api');
 const { findPlayerByRank } = require('../data/leaderboard');
 const { calculateRRToGoal, calculateSessionStats } = require('../services/game');
 const log = require('../utils/logger');
@@ -125,7 +125,7 @@ router.get('/advanced_wl/:name/:tag/:region', async (req, res) => {
     }
     
     try {
-        const [account, history] = await Promise.all([ fetchAccountDetails(name, tag), fetchMatchHistory(name, tag, region, 'competitive', 25) ]);
+        const [account, history, mmrHistory] = await Promise.all([ fetchAccountDetails(name, tag), fetchMatchHistory(name, tag, region, 'competitive', 25), fetchMMRHistory(name, tag, region) ]);
         
         if (!account.data || !account.data.puuid) {
             res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza.');
@@ -133,12 +133,19 @@ router.get('/advanced_wl/:name/:tag/:region', async (req, res) => {
         }
         
         const { startTime, endTime } = getSessionTimeRange(req.query.since ? parseInt(req.query.since, 10) : null, resetTime);
-        const { wins, losses, draws, lastMatchResult, lastMatchRR } = calculateSessionStats(history, account.data.puuid, startTime, endTime);
+        let { wins, losses, draws, lastMatchResult, lastMatchRR } = calculateSessionStats(history, account.data.puuid, startTime, endTime);
+        
+        if (lastMatchRR === null && mmrHistory.data && mmrHistory.data.length > 0) {
+            const latestMMR = mmrHistory.data[0];
+            if (latestMMR.mmr_change_to_last_game !== undefined) {
+                lastMatchRR = latestMMR.mmr_change_to_last_game;
+            }
+        }
         
         let result = draws > 0 ? `${wins}W/${draws}D/${losses}L` : `${wins}W/${losses}L`;
         if (lastMatchResult) {
-            result += ` (Ostatni: ${lastMatchResult}`;
-            if (lastMatchRR !== null) { result += ` ${lastMatchRR >= 0 ? '+' : ''}${lastMatchRR}RR`; }
+            result += ` (Last: `; //${lastMatchResult} removed
+            if (lastMatchRR != null) { result += ` ${lastMatchRR >= 0 ? '+' : ''}${lastMatchRR}RR`; }
             result += ')';
         }
         res.type('text/plain').send(result);

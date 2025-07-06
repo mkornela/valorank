@@ -61,6 +61,10 @@ async function fetchPlayerMMR(name, tag, region) {
     return fetchFromHenrikApi(`/valorant/v2/mmr/${region.toLowerCase()}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`); 
 }
 
+async function fetchMMRHistory(name, tag, region) {
+    return fetchFromHenrikApi(`/valorant/v1/mmr-history/${region.toLowerCase()}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`);
+}
+
 async function fetchMatchHistory(name, tag, region, gameMode = 'competitive', totalSize = 25) {
     const platform = 'pc';
     const numRequests = Math.ceil(totalSize / MAX_MATCHES_PER_REQUEST);
@@ -112,6 +116,7 @@ module.exports = {
     fetchFromHenrikApi,
     fetchAccountDetails,
     fetchPlayerMMR,
+    fetchMMRHistory,
     fetchMatchHistory,
     fetchLeaderboard
 };
