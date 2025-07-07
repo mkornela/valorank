@@ -460,7 +460,7 @@
             }
             
             try {
-                const response = await fetch(`http://${apiUrl}/rank/${playerName}/${playerTag}/${region}?text={rank}%20{rr}`);
+                const response = await fetch(`https://${apiUrl}/rank/${playerName}/${playerTag}/${region}?text={rank}%20{rr}`);
                 const data = await response.text(); // Changed from json() to text()
                 
                 console.log('API Response:', data);
