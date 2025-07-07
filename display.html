@@ -288,11 +288,60 @@
             right: 20px;
             z-index: 10;
         }
+
+        .status {
+            position: absolute;
+            top: 60px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: #2c3e50;
+            z-index: 10;
+        }
+
+        .input-section {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 10;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-small {
+            width: 120px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
-    <input type="text" class="api-input" placeholder="API URL (np. valorank.bieda.it)" value="valorank.bieda.it" id="apiUrl">
+    <div class="input-section">
+        <input type="text" class="api-input" placeholder="API URL (np. valorank.bieda.it)" value="valorank.bieda.it" id="apiUrl">
+        <div class="input-row">
+            <input type="text" class="input-small" placeholder="Nick" id="playerName">
+            <input type="text" class="input-small" placeholder="Tag" id="playerTag">
+            <input type="text" class="input-small" placeholder="Region" value="eu" id="region">
+        </div>
+    </div>
+    
     <button class="btn update-btn" onclick="updateRankData()">Aktualizuj</button>
+    <div class="status" id="status">Gotowy</div>
     
     <div class="rank-overlay" id="rankOverlay">
         <div class="rank-icon" id="rankIcon">
@@ -335,9 +384,16 @@
             radiant: { name: 'Radiant', icon: '☀️', tiers: 1, maxRR: 500, tier: 11 }
         };
 
+        function setStatus(message, isError = false) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.style.color = isError ? '#ff4444' : '#2c3e50';
+        }
+
         // Fetch Valorant rank icons from API
         async function fetchValorantRankIcons() {
             try {
+                setStatus('Ładowanie ikon...');
                 const response = await fetch('https://valorant-api.com/v1/competitivetiers');
                 const data = await response.json();
                 
@@ -375,11 +431,12 @@
                         });
                         
                         console.log('Valorant rank icons loaded:', valorantRankIcons);
-                        console.log('Available tiers from API:', latestTiers.tiers.map(t => t.tierName));
+                        setStatus('Ikony załadowane');
                     }
                 }
             } catch (error) {
                 console.error('Error fetching Valorant rank icons:', error);
+                setStatus('Błąd ładowania ikon', true);
             }
         }
 
@@ -450,18 +507,30 @@
 
         async function updateRankData() {
             const apiUrl = document.getElementById('apiUrl').value;
-            const playerName = prompt('Podaj nick gracza:');
-            const playerTag = prompt('Podaj tag gracza:');
-            const region = prompt('Podaj region (np. eu):') || 'eu';
+            const playerName = document.getElementById('playerName').value;
+            const playerTag = document.getElementById('playerTag').value;
+            const region = document.getElementById('region').value || 'eu';
             
-            if (!playerName || !playerTag) {
-                alert('Musisz podać nick i tag gracza!');
+            if (!apiUrl.trim()) {
+                setStatus('Podaj URL API!', true);
                 return;
             }
             
+            if (!playerName.trim() || !playerTag.trim()) {
+                setStatus('Podaj nick i tag!', true);
+                return;
+            }
+            
+            setStatus('Pobieranie danych...');
+            
             try {
-                const response = await fetch(`https://${apiUrl}/rank/${playerName}/${playerTag}/${region}?text={rank}%20{rr}`);
-                const data = await response.text(); // Changed from json() to text()
+                const url = `https://${apiUrl}/rank/${playerName}/${playerTag}/${region}?text={rank}%20{rr}`;
+                console.log('Fetching from:', url);
+                
+                // Try direct fetch first
+                let data;
+                const response = await fetch(url);
+                data = await response.text();
                 
                 console.log('API Response:', data);
                 
@@ -477,18 +546,28 @@
                         rankInfo.progress,
                         rankInfo.icon
                     );
+                    setStatus('Dane zaktualizowane!');
                 } else {
-                    alert('Nie udało się sparsować danych rangi. Sprawdź odpowiedź w konsoli.');
+                    setStatus('Błąd parsowania danych', true);
                 }
             } catch (error) {
                 console.error('Błąd:', error);
-                alert('Nie udało się połączyć z API. Sprawdź URL i czy serwer działa.');
+                setStatus('Błąd połączenia z API', true);
+                
+                // Show detailed error info
+                alert(`Błąd połączenia z API: ${error.message}\n\nSprawdź:\n1. Czy API URL jest poprawny\n2. Czy serwer API działa\n3. Czy nick i tag są poprawne\n\nMożesz też użyć przycisków symulacji poniżej.`);
             }
         }
 
         function parseRankData(apiResponse) {
             try {
                 console.log('Parsing API response:', apiResponse);
+                
+                // Handle JSON response from allorigins proxy
+                if (apiResponse.startsWith('{') && apiResponse.includes('contents')) {
+                    const jsonData = JSON.parse(apiResponse);
+                    apiResponse = jsonData.contents;
+                }
                 
                 // Parse format: "Diamond 1 10" -> rank="Diamond", tier="1", rr="10"
                 const parts = apiResponse.trim().split(' ');
@@ -533,7 +612,8 @@
         // Initialize
         window.addEventListener('load', async () => {
             await fetchValorantRankIcons();
-            simulateRank('immortal');
+            simulateRank('ascendant');
+            setStatus('Gotowy');
         });
     </script>
 </body>
