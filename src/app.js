@@ -49,4 +49,14 @@ app.get('/statystyki', (req, res) => {
     }
 });
 
+app.get('/display', (req, res) => {
+    const docsFilePath = path.join(process.cwd(), 'display.html');
+    
+    if (fs.existsSync(docsFilePath)) {
+        res.sendFile(docsFilePath);
+    } else {
+        res.status(404).send('Błąd API. Skontaktuj się z administratorem!');
+    }
+});
+
 module.exports = app;

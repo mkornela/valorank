@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Valorant Rank Overlay</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background: transparent;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .rank-overlay {
+            position: relative;
+            width: 400px;
+            height: 120px;
+            background: linear-gradient(135deg, 
+                rgba(255, 70, 85, 0.95) 0%, 
+                rgba(255, 170, 80, 0.95) 50%, 
+                rgba(255, 255, 255, 0.95) 100%);
+            border-radius: 20px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.4),
+                inset 0 2px 4px rgba(255, 255, 255, 0.1);
+            animation: slideIn 0.8s ease-out;
+            overflow: hidden;
+        }
+        
+        .rank-overlay::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(255, 255, 255, 0.4) 50%, 
+                transparent 100%);
+            animation: shimmer 3s infinite;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(-100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+        
+        .rank-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: radial-gradient(circle, 
+                rgba(255, 255, 255, 0.9) 0%, 
+                rgba(255, 255, 255, 0.6) 70%, 
+                transparent 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            color: #2c3e50;
+            border: 3px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 
+                0 4px 20px rgba(0, 0, 0, 0.3),
+                inset 0 2px 8px rgba(255, 255, 255, 0.2);
+            position: relative;
+            z-index: 2;
+            overflow: hidden;
+        }
+
+        .rank-icon img {
+            width: 70px;
+            height: 70px;
+            object-fit: contain;
+        }
+        
+        .rank-info {
+            flex: 1;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            position: relative;
+            z-index: 2;
+        }
+        
+        .rank-name {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        
+        .rank-rr {
+            font-size: 1.2rem;
+            font-weight: 500;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+        
+        .rank-progress {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .rank-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, 
+                rgba(255, 255, 255, 0.8) 0%, 
+                rgba(255, 255, 255, 1) 100%);
+            border-radius: 4px;
+            transition: width 0.8s ease-out;
+            box-shadow: 0 2px 8px rgba(255, 255, 255, 0.4);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { 
+                box-shadow: 0 2px 8px rgba(255, 255, 255, 0.4);
+            }
+            50% { 
+                box-shadow: 0 2px 16px rgba(255, 255, 255, 0.8);
+            }
+        }
+        
+        .rank-tier {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #2c3e50;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 3;
+        }
+        
+        /* Rank-specific styling */
+        .iron { 
+            background: linear-gradient(135deg, 
+                rgba(74, 74, 74, 0.95) 0%, 
+                rgba(120, 120, 120, 0.95) 100%);
+        }
+        
+        .bronze { 
+            background: linear-gradient(135deg, 
+                rgba(205, 127, 50, 0.95) 0%, 
+                rgba(255, 165, 0, 0.95) 100%);
+        }
+        
+        .silver { 
+            background: linear-gradient(135deg, 
+                rgba(192, 192, 192, 0.95) 0%, 
+                rgba(255, 255, 255, 0.95) 100%);
+        }
+        
+        .gold { 
+            background: linear-gradient(135deg, 
+                rgba(255, 215, 0, 0.95) 0%, 
+                rgba(255, 245, 157, 0.95) 100%);
+        }
+        
+        .platinum { 
+            background: linear-gradient(135deg, 
+                rgba(0, 255, 255, 0.95) 0%, 
+                rgba(173, 216, 230, 0.95) 100%);
+        }
+        
+        .diamond { 
+            background: linear-gradient(135deg, 
+                rgba(185, 242, 255, 0.95) 0%, 
+                rgba(255, 255, 255, 0.95) 100%);
+        }
+        
+        .ascendant { 
+            background: linear-gradient(135deg, 
+                rgba(0, 255, 127, 0.95) 0%, 
+                rgba(50, 205, 50, 0.95) 100%);
+        }
+        
+        .immortal { 
+            background: linear-gradient(135deg, 
+                rgba(255, 20, 147, 0.95) 0%, 
+                rgba(255, 105, 180, 0.95) 100%);
+        }
+        
+        .radiant { 
+            background: linear-gradient(135deg, 
+                rgba(255, 255, 0, 0.95) 0%, 
+                rgba(255, 255, 255, 0.95) 50%,
+                rgba(255, 215, 0, 0.95) 100%);
+            animation: radiantGlow 2s infinite alternate;
+        }
+        
+        @keyframes radiantGlow {
+            0% { 
+                box-shadow: 
+                    0 8px 32px rgba(255, 255, 0, 0.4),
+                    inset 0 2px 4px rgba(255, 255, 255, 0.1);
+            }
+            100% { 
+                box-shadow: 
+                    0 8px 32px rgba(255, 255, 0, 0.8),
+                    inset 0 2px 4px rgba(255, 255, 255, 0.3);
+            }
+        }
+        
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 10;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 20px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #2c3e50;
+        }
+        
+        .btn:hover {
+            background: rgba(255, 255, 255, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        .api-input {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 500;
+            width: 200px;
+            z-index: 10;
+        }
+        
+        .update-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <input type="text" class="api-input" placeholder="API URL (np. valorank.bieda.it)" value="valorank.bieda.it" id="apiUrl">
+    <button class="btn update-btn" onclick="updateRankData()">Aktualizuj</button>
+    
+    <div class="rank-overlay" id="rankOverlay">
+        <div class="rank-icon" id="rankIcon">
+            <img src="" alt="Rank Icon" id="rankImage" style="display: none;">
+            <span id="rankEmoji">💎</span>
+        </div>
+        <div class="rank-info">
+            <div class="rank-name" id="rankName">Ascendant 3</div>
+            <div class="rank-rr" id="rankRR">77 RR • 24 pozostało</div>
+            <div class="rank-progress">
+                <div class="rank-progress-fill" id="progressFill" style="width: 76%"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button class="btn" onclick="simulateRank('iron')">Iron</button>
+        <button class="btn" onclick="simulateRank('bronze')">Bronze</button>
+        <button class="btn" onclick="simulateRank('silver')">Silver</button>
+        <button class="btn" onclick="simulateRank('gold')">Gold</button>
+        <button class="btn" onclick="simulateRank('platinum')">Platinum</button>
+        <button class="btn" onclick="simulateRank('diamond')">Diamond</button>
+        <button class="btn" onclick="simulateRank('ascendant')">Ascendant</button>
+        <button class="btn" onclick="simulateRank('immortal')">Immortal</button>
+        <button class="btn" onclick="simulateRank('radiant')">Radiant</button>
+    </div>
+
+    <script>
+        let valorantRankIcons = {};
+        
+        const rankData = {
+            iron: { name: 'Iron', icon: '⚫', tiers: 3, maxRR: 100, tier: 3 },
+            bronze: { name: 'Bronze', icon: '🥉', tiers: 3, maxRR: 100, tier: 4 },
+            silver: { name: 'Silver', icon: '🥈', tiers: 3, maxRR: 100, tier: 5 },
+            gold: { name: 'Gold', icon: '🥇', tiers: 3, maxRR: 100, tier: 6 },
+            platinum: { name: 'Platinum', icon: '💿', tiers: 3, maxRR: 100, tier: 7 },
+            diamond: { name: 'Diamond', icon: '💎', tiers: 3, maxRR: 100, tier: 8 },
+            ascendant: { name: 'Ascendant', icon: '⭐', tiers: 3, maxRR: 100, tier: 9 },
+            immortal: { name: 'Immortal', icon: '🔥', tiers: 3, maxRR: 100, tier: 10 },
+            radiant: { name: 'Radiant', icon: '☀️', tiers: 1, maxRR: 500, tier: 11 }
+        };
+
+        // Fetch Valorant rank icons from API
+        async function fetchValorantRankIcons() {
+            try {
+                const response = await fetch('https://valorant-api.com/v1/competitivetiers');
+                const data = await response.json();
+                
+                if (data.status === 200 && data.data) {
+                    // Get the latest competitive tier data (usually the last one)
+                    const latestTiers = data.data[data.data.length - 1];
+                    
+                    if (latestTiers && latestTiers.tiers) {
+                        // Map Valorant API tier names to our rank names
+                        const rankMapping = {
+                            'iron': 'iron',
+                            'bronze': 'bronze', 
+                            'silver': 'silver',
+                            'gold': 'gold',
+                            'platinum': 'platinum',
+                            'diamond': 'diamond',
+                            'ascendant': 'ascendant',
+                            'immortal': 'immortal',
+                            'radiant': 'radiant'
+                        };
+                        
+                        latestTiers.tiers.forEach(tier => {
+                            if (tier.largeIcon && tier.tierName) {
+                                const tierName = tier.tierName.toLowerCase();
+                                
+                                // Check if this tier name matches any of our ranks
+                                Object.keys(rankMapping).forEach(ourRank => {
+                                    if (tierName.includes(ourRank)) {
+                                        if (!valorantRankIcons[ourRank]) {
+                                            valorantRankIcons[ourRank] = tier.largeIcon;
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                        
+                        console.log('Valorant rank icons loaded:', valorantRankIcons);
+                        console.log('Available tiers from API:', latestTiers.tiers.map(t => t.tierName));
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching Valorant rank icons:', error);
+            }
+        }
+
+        function simulateRank(rankType) {
+            const data = rankData[rankType];
+            const tier = Math.floor(Math.random() * data.tiers) + 1;
+            const currentRR = Math.floor(Math.random() * data.maxRR);
+            const remaining = data.maxRR - currentRR;
+            const progress = (currentRR / data.maxRR) * 100;
+            
+            updateRankDisplay(rankType, data.name, tier, currentRR, remaining, progress, data.icon);
+        }
+
+        function updateRankDisplay(rankClass, rankName, tier, currentRR, remaining, progress, fallbackIcon) {
+            const overlay = document.getElementById('rankOverlay');
+            const rankIcon = document.getElementById('rankIcon');
+            const rankNameEl = document.getElementById('rankName');
+            const rankRREl = document.getElementById('rankRR');
+            const progressFill = document.getElementById('progressFill');
+            const rankTierEl = document.getElementById('rankTier');
+            const rankImage = document.getElementById('rankImage');
+            const rankEmoji = document.getElementById('rankEmoji');
+            
+            // Remove all rank classes
+            overlay.className = 'rank-overlay';
+            
+            // Add new rank class
+            overlay.classList.add(rankClass);
+            
+            // Update content
+            rankNameEl.textContent = rankClass === 'radiant' ? rankName : `${rankName} ${tier}`;
+            rankRREl.textContent = `${currentRR} RR • ${remaining} pozostało`;
+            
+            // Try to use Valorant API icon, fallback to emoji
+            const iconUrl = valorantRankIcons[rankClass];
+            console.log(`Looking for icon for rank: ${rankClass}, found:`, iconUrl);
+            
+            if (iconUrl) {
+                rankImage.src = iconUrl;
+                rankImage.style.display = 'block';
+                rankEmoji.style.display = 'none';
+                
+                // Handle image load error
+                rankImage.onerror = () => {
+                    console.log('Failed to load image, falling back to emoji');
+                    rankImage.style.display = 'none';
+                    rankEmoji.style.display = 'block';
+                    rankEmoji.textContent = fallbackIcon;
+                };
+            } else {
+                rankImage.style.display = 'none';
+                rankEmoji.style.display = 'block';
+                rankEmoji.textContent = fallbackIcon;
+            }
+            
+            // Animate progress bar
+            progressFill.style.width = '0%';
+            setTimeout(() => {
+                progressFill.style.width = `${progress}%`;
+            }, 100);
+            
+            // Add slide animation
+            overlay.style.animation = 'none';
+            setTimeout(() => {
+                overlay.style.animation = 'slideIn 0.8s ease-out';
+            }, 10);
+        }
+
+        async function updateRankData() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const playerName = prompt('Podaj nick gracza:');
+            const playerTag = prompt('Podaj tag gracza:');
+            const region = prompt('Podaj region (np. eu):') || 'eu';
+            
+            if (!playerName || !playerTag) {
+                alert('Musisz podać nick i tag gracza!');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`http://${apiUrl}/rank/${playerName}/${playerTag}/${region}?text={rank}%20{rr}`);
+                const data = await response.text(); // Changed from json() to text()
+                
+                console.log('API Response:', data);
+                
+                // Parse rank data from API response
+                const rankInfo = parseRankData(data);
+                if (rankInfo) {
+                    updateRankDisplay(
+                        rankInfo.rankClass,
+                        rankInfo.rankName,
+                        rankInfo.tier,
+                        rankInfo.currentRR,
+                        rankInfo.remaining,
+                        rankInfo.progress,
+                        rankInfo.icon
+                    );
+                } else {
+                    alert('Nie udało się sparsować danych rangi. Sprawdź odpowiedź w konsoli.');
+                }
+            } catch (error) {
+                console.error('Błąd:', error);
+                alert('Nie udało się połączyć z API. Sprawdź URL i czy serwer działa.');
+            }
+        }
+
+        function parseRankData(apiResponse) {
+            try {
+                console.log('Parsing API response:', apiResponse);
+                
+                // Parse format: "Diamond 1 10" -> rank="Diamond", tier="1", rr="10"
+                const parts = apiResponse.trim().split(' ');
+                
+                if (parts.length < 3) {
+                    console.error('Invalid API response format. Expected: "RankName Tier RR"');
+                    return null;
+                }
+                
+                const rankName = parts[0]; // "Diamond"
+                const tier = parseInt(parts[1]); // 1
+                const currentRR = parseInt(parts[2]); // 10
+                
+                // Convert rank name to our format
+                const rankClass = rankName.toLowerCase();
+                const rankInfo = rankData[rankClass];
+                
+                if (!rankInfo) {
+                    console.error('Unknown rank:', rankName);
+                    return null;
+                }
+                
+                const maxRR = rankInfo.maxRR;
+                const remaining = maxRR - currentRR;
+                const progress = (currentRR / maxRR) * 100;
+                
+                return {
+                    rankClass: rankClass,
+                    rankName: rankInfo.name,
+                    tier: tier,
+                    currentRR: currentRR,
+                    remaining: remaining,
+                    progress: progress,
+                    icon: rankInfo.icon
+                };
+            } catch (error) {
+                console.error('Błąd parsowania danych:', error);
+                return null;
+            }
+        }
+
+        // Initialize
+        window.addEventListener('load', async () => {
+            await fetchValorantRankIcons();
+            simulateRank('immortal');
+        });
+    </script>
+</body>
+</html>
