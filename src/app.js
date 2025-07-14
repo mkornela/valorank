@@ -59,4 +59,36 @@ app.get('/display', (req, res) => {
     }
 });
 
+app.get('/health', (req, res) => {
+    try {
+        const healthStatus = {
+            status: 'ok',
+            timestamp: new Date().toISOString(),
+            uptime: process.uptime(),
+            memory: process.memoryUsage(),
+            version: process.version,
+            environment: process.env.NODE_ENV || 'development'
+        };
+
+        // Sprawdź czy pliki statystyk istnieją
+        const statsFilePath = path.join(process.cwd(), 'valorant_stats.html');
+        const docsFilePath = path.join(process.cwd(), 'docs.html');
+        
+        healthStatus.files = {
+            stats: fs.existsSync(statsFilePath),
+            docs: fs.existsSync(docsFilePath)
+        };
+
+        log.info('HEALTH', `Health check passed from ${req.ip}`);
+        res.status(200).json(healthStatus);
+    } catch (error) {
+        log.error('HEALTH', 'Health check failed', error);
+        res.status(500).json({
+            status: 'error',
+            timestamp: new Date().toISOString(),
+            error: error.message
+        });
+    }
+});
+
 module.exports = app;
