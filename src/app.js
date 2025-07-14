@@ -3,12 +3,12 @@ const path = require('path');
 const fs = require('fs');
 const valorantRoutes = require('./routes/valorantRoutes');
 const { logToDiscord } = require('./utils/discord');
-// Nie potrzebujemy już importować apiEndpoints ani config/docs
-// const apiEndpoints = require('./config/docs'); 
+const config = require('./config/index');
+const log = require('./utils/logger');
 
 const app = express();
 
-app.set('view engine', 'ejs'); // EJS może zostać, jeśli inne części go używają
+app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '..', 'views'));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.enable('trust proxy');
