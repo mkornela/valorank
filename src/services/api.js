@@ -1,6 +1,7 @@
 const config = require('../config');
 const { MAX_MATCHES_PER_REQUEST } = require('../constants');
 const log = require('../utils/logger');
+const { logToDiscord } = require('../utils/discord');
 
 let fetch;
 

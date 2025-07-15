@@ -4,6 +4,7 @@ const valorantRoutes = require('./routes/valorantRoutes');
 const appRoutes = require('./routes/appRoutes'); // <-- Nowy import
 const config = require('./config/index');
 const log = require('./utils/logger');
+const { logToDiscord } = require('./utils/discord');
 
 const app = express();
 
