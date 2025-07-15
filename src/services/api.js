@@ -58,7 +58,7 @@ async function fetchAccountDetails(name, tag) {
     return fetchFromHenrikApi(`/valorant/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`); 
 }
 
-async function fetchPlayerMMR(region, name, tag) { 
+async function fetchPlayerMMR(name, tag, region) { 
     return fetchFromHenrikApi(`/valorant/v2/mmr/${region.toLowerCase()}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`); 
 }
 

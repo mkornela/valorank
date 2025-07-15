@@ -17,7 +17,7 @@ const asyncHandler = fn => (req, res, next) => {
 router.get('/api/rank', asyncHandler(async (req, res, next) => {
     const { STATS_PLAYER_NAME, STATS_PLAYER_TAG, STATS_PLAYER_REGION } = require('../config');
     
-    const mmrData = await fetchPlayerMMR(STATS_PLAYER_REGION, STATS_PLAYER_NAME, STATS_PLAYER_TAG);
+    const mmrData = await fetchPlayerMMR(STATS_PLAYER_NAME, STATS_PLAYER_TAG, STATS_PLAYER_REGION);
     
     if (mmrData && mmrData.data) {
         res.json(mmrData.data);
