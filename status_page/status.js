@@ -87,14 +87,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderTimeline() {
         const history = getHistory();
-        const today = new Date();
+        const historyKeys = Object.keys(history).sort();
         elements.timelineGrid.innerHTML = '';
 
-        for (let i = DAYS_TO_SHOW - 1; i >= 0; i--) {
-            const date = new Date(today);
-            date.setDate(today.getDate() - i);
-            const dateString = date.toISOString().split('T')[0];
-            const status = history[dateString] || 'no-data';
+        // Update timeline period text
+        if (historyKeys.length === 0) {
+            elements.timelinePeriod.textContent = 'Brak danych';
+            
+            // Show today as a starting point
+            const today = new Date();
+            const todayString = today.toISOString().split('T')[0];
+            
+            const bar = document.createElement('div');
+            bar.className = 'timeline-bar no-data';
+            
+            const tooltip = document.createElement('div');
+            tooltip.className = 'tooltip';
+            tooltip.innerHTML = `
+                <strong>${formatDate(todayString)}</strong><br>
+                Status: Brak danych
+            `;
+            
+            bar.appendChild(tooltip);
+            elements.timelineGrid.appendChild(bar);
+            return;
+        }
+
+        // Update period text with actual date range
+        const firstDate = formatDate(historyKeys[0]);
+        const lastDate = formatDate(historyKeys[historyKeys.length - 1]);
+        const dayCount = historyKeys.length;
+        
+        if (dayCount === 1) {
+            elements.timelinePeriod.textContent = `1 dzień (${firstDate})`;
+        } else {
+            elements.timelinePeriod.textContent = `${dayCount} dni (${firstDate} - ${lastDate})`;
+        }
+
+        // Show only days with actual data
+        historyKeys.forEach(dateString => {
+            const status = history[dateString];
             
             const bar = document.createElement('div');
             bar.className = `timeline-bar ${status}`;
@@ -103,12 +135,12 @@ document.addEventListener('DOMContentLoaded', () => {
             tooltip.className = 'tooltip';
             tooltip.innerHTML = `
                 <strong>${formatDate(dateString)}</strong><br>
-                Status: ${STATUS_CONFIG[status]?.serviceText || 'Brak danych'}
+                Status: ${STATUS_CONFIG[status]?.serviceText || 'Nieznany'}
             `;
             
             bar.appendChild(tooltip);
             elements.timelineGrid.appendChild(bar);
-        }
+        });
     }
 
     async function checkStatus() {
