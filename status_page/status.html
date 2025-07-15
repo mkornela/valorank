@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status API - Valorank</title>
+    <link rel="stylesheet" href="status.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="status-header">
+                <div class="status-indicator" id="status-indicator"></div>
+                <h1 id="main-status-text">Ładowanie statusu...</h1>
+            </div>
+            <p id="last-updated">Sprawdzanie...</p>
+        </header>
+
+        <main>
+            <div class="timeline-grid" id="timeline-grid">
+                <!-- Paski statusu będą generowane przez JavaScript -->
+            </div>
+            <div class="legend">
+                <div class="legend-item"><span class="legend-color operational"></span> Działa poprawnie</div>
+                <div class="legend-item"><span class="legend-color degraded"></span> Zdegradowana wydajność</div>
+                <div class="legend-item"><span class="legend-color error"></span> Awaria</div>
+                <div class="legend-item"><span class="legend-color no-data"></span> Brak danych</div>
+            </div>
+
+            <div class="incidents">
+                <h2>Ostatnie komunikaty</h2>
+                <div id="incident-log">
+                    <div class="incident">
+                        <p class="incident-date">14 lipca 2025</p>
+                        <p class="incident-message">Wszystkie systemy monitorujące zostały uruchomione.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <footer>
+             <a href="/">Powrót do dokumentacji</a>
+        </footer>
+    </div>
+    <script src="status.js"></script>
+</body>
+</html>

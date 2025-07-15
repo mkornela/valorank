@@ -3,7 +3,7 @@ const { getLeaderboardData } = require('../data/leaderboard');
 
 function calculateRRToGoal(currentTier, currentRR, liveLeaderboardPlayers = null) {
     if (currentTier === 27) { 
-        return { rr: 0, goal: "Jesteś na szczycie!" }; 
+        return { rr: 0, goal: "Radiant!" }; 
     }
     
     if (currentTier >= 26) { 
@@ -25,21 +25,19 @@ function calculateRRToGoal(currentTier, currentRR, liveLeaderboardPlayers = null
 function calculateSessionStats(matchHistoryData, mmrHistoryArray, playerPuuid, sessionStartTime, sessionEndTime) {
    let wins = 0, losses = 0, draws = 0, totalRRChange = 0, latestMap = null, lastMatchResult = null, lastMatchRR = null;
    
-   // 1. Oblicz bilans RR bezpośrednio z historii MMR na podstawie czasu, obsługując oba formaty API (v1 i v2)
    if (Array.isArray(mmrHistoryArray)) {
        let isFirstRRMatchInSession = true;
        for (const entry of mmrHistoryArray) {
            let entryDate, rrChange;
 
-           // Sprawdź format danych i przypisz odpowiednie wartości
-           if (entry.date) { // Format z v2 API
+           if (entry.date) {
                entryDate = new Date(entry.date);
                rrChange = entry.last_change;
-           } else if (entry.date_raw) { // Format z v1 API
-               entryDate = new Date(entry.date_raw * 1000); // Unix timestamp
+           } else if (entry.date_raw) {
+               entryDate = new Date(entry.date_raw * 1000);
                rrChange = entry.mmr_change_to_last_game;
            } else {
-               continue; // Pomiń wpis, jeśli nie ma daty
+               continue;
            }
 
            if (!isNaN(entryDate.getTime()) && entryDate >= sessionStartTime && entryDate < sessionEndTime) {
@@ -54,7 +52,6 @@ function calculateSessionStats(matchHistoryData, mmrHistoryArray, playerPuuid, s
        }
    }
    
-   // 2. Oblicz W/L/D i dane ostatniego meczu z historii meczów
    if (matchHistoryData && Array.isArray(matchHistoryData.data) && matchHistoryData.data.length > 0) {
        let isFirstMatch = true;
        for (const match of matchHistoryData.data) {

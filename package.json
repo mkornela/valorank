@@ -1,6 +1,6 @@
 {
-  "name": "valorant",
-  "version": "2.0.0",
+  "name": "valorank",
+  "version": "3.0.0",
   "description": "A custom Valorant stats API and dashboard",
   "main": "index.js",
   "scripts": {

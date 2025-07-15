@@ -118,6 +118,16 @@ async function fetchLeaderboard(region) {
     return fetchFromHenrikApi(`/valorant/v3/leaderboard/${region.toLowerCase()}/pc`);
 }
 
+async function checkApiStatus(region = 'eu') {
+    try {
+        const data = await fetchFromHenrikApi(`/valorant/v1/status/${region}`);
+        return { reachable: true, data: data };
+    } catch (error) {
+        log.warn('API_CHECK', `Ping do HenrikDev API nie powiódł się: ${error.message}`);
+        return { reachable: false, error: error.message };
+    }
+}
+
 module.exports = {
     initFetch,
     fetchFromHenrikApi,
@@ -126,5 +136,6 @@ module.exports = {
     fetchMMRHistory,
     fetchMMRHistoryDaily,
     fetchMatchHistory,
-    fetchLeaderboard
+    fetchLeaderboard,
+    checkApiStatus
 };

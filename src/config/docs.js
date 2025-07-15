@@ -58,6 +58,26 @@ const apiEndpoints = [
             request: "/statystyki",
             response: "Zwraca stronę HTML..."
         }
+    },
+    {
+        title: "🩺 Health Check",
+        endpoint: "GET /health",
+        description: "Zwraca status techniczny API. Służy do monitorowania działania serwisu. Zwraca kod 200, jeśli wszystko działa, lub 503, jeśli występuje problem (np. brak połączenia z API Henrika).",
+        params: [],
+        example: {
+            request: "/health",
+            response: "{ \"status\": \"operational\", \"timestamp\": \"...\", ... }"
+        }
+    },
+    {
+        title: "🖥️ Strona Statusu API",
+        endpoint: "GET /status",
+        description: "Wyświetla przyjazną dla użytkownika stronę z wizualizacją dostępności API w ciągu ostatnich 90 dni.",
+        params: [],
+        example: {
+            request: "/status",
+            response: "Zwraca stronę HTML z paskami statusu..."
+        }
     }
 ];
 
