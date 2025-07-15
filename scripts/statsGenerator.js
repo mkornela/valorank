@@ -201,11 +201,16 @@ function generateHTML(dailyStats, playerInfo) {
         document.addEventListener('DOMContentLoaded', () => {
             const placeholder = document.getElementById('rank-panel-placeholder');
             fetch('https://api.valo.lol/api/rank').then(response => { if (!response.ok) { throw new Error(\`Network response was not ok, status: \${response.status}\`); } return response.json(); }).then(data => {
-                if (data && data.current && data.current.tier) {
-                    const currentRank = data.current, peakRank = data.peak;
-                    const rr = currentRank.rr;
-                    const progress = currentRank.tier.name === 'Immortal 3' ? (rr / 550) * 100 : (rr / 100) * 100;
-                    const rankPanelHtml = \`<div class="rank-icon"><img src="\${TIER_ICONS[currentRank.tier.id] || ''}" alt="\${currentRank.tier.name || 'Unknown Rank'}"></div><div class="rank-details"><div class="rank-name">\${currentRank.tier.name || 'Brak Danych'}</div><div class="rank-rr">\${currentRank.rr} RR <span class="rr-change \${currentRank.last_change >= 0 ? 'rr-change-positive' : 'rr-change-negative'}">(\${currentRank.last_change >= 0 ? '+' : ''}\${currentRank.last_change})</span></div><div class="progress-bar-wrapper"><div class="progress-bar"><div class="progress-bar-inner" style="width: \${progress}%"></div></div><img class="peak-rank-icon" src="\${peakRank && peakRank.tier ? (TIER_ICONS[peakRank.tier.id] || '') : ''}" alt="\${peakRank && peakRank.tier ? (peakRank.tier.name || 'Peak Rank') : ''}" title="Peak: \${peakRank && peakRank.tier ? (peakRank.tier.name || '') : ''}"></div></div>\`;
+                if (data && data.current_data && data.current_data.currenttierpatched) {
+                    const currentRankData = data.current_data;
+                    const tierId = currentRankData.currenttier;
+                    const tierName = currentRankData.currenttierpatched;
+                    const rr = currentRankData.ranking_in_tier;
+                    const lastChange = currentRankData.mmr_change_to_last_game;
+                    
+                    const progress = tierName === 'Immortal 3' ? (rr / 550) * 100 : (rr / 100) * 100;
+                    
+                    const rankPanelHtml = \`<div class="rank-icon"><img src="\${TIER_ICONS[tierId] || ''}" alt="\${tierName || 'Unknown Rank'}"></div><div class="rank-details"><div class="rank-name">\${tierName || 'Brak Danych'}</div><div class="rank-rr">\${rr} RR <span class="rr-change \${lastChange >= 0 ? 'rr-change-positive' : 'rr-change-negative'}">(\${lastChange >= 0 ? '+' : ''}\${lastChange})</span></div><div class="progress-bar-wrapper"><div class="progress-bar"><div class="progress-bar-inner" style="width: \${progress}%"></div></div></div></div>\`;
                     placeholder.innerHTML = rankPanelHtml;
                 } else { placeholder.innerHTML = '<p>Nie udało się załadować danych o randze. API zwróciło niekompletne dane.</p>'; }
             }).catch(error => { console.error('Error fetching rank data:', error); placeholder.innerHTML = '<p>Wystąpił błąd podczas ładowania danych o randze.</p>'; });
