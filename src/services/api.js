@@ -59,7 +59,7 @@ async function fetchAccountDetails(name, tag) {
 }
 
 async function fetchPlayerMMR(name, tag, region) { 
-    return fetchFromHenrikApi(`/valorant/v2/mmr/${region.toLowerCase()}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`); 
+    return fetchFromHenrikApi(`/valorant/v3/mmr/${region.toLowerCase()}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`); 
 }
 
 // Funkcja dla /daily, używa endpointu v2

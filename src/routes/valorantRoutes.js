@@ -20,7 +20,7 @@ router.get('/api/rank', asyncHandler(async (req, res, next) => {
     const encodedTag = encodeURIComponent(STATS_PLAYER_TAG);
     const encodedRegion = encodeURIComponent(STATS_PLAYER_REGION);
     
-    const mmrData = await fetchPlayerMMR(encodedName, encodedTag, encodedRegion);
+    const mmrData = await fetchPlayerMMR(encodedRegion, encodedName, encodedTag);
     
     if (mmrData && mmrData.data) {
         res.json(mmrData.data);
