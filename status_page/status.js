@@ -1,108 +1,156 @@
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/health';
     const DAYS_TO_SHOW = 90;
-    const CHECK_INTERVAL = 5 * 60 * 1000; // 5 minut
+    const CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
-    const mainStatusText = document.getElementById('main-status-text');
-    const statusIndicator = document.getElementById('status-indicator');
-    const lastUpdatedText = document.getElementById('last-updated');
-    const timelineGrid = document.getElementById('timeline-grid');
+    const elements = {
+        mainStatusText: document.getElementById('main-status-text'),
+        statusDescription: document.getElementById('status-description'),
+        statusIcon: document.getElementById('status-icon'),
+        serviceStatus: document.getElementById('service-status'),
+        mainService: document.getElementById('main-service'),
+        lastUpdated: document.getElementById('last-updated'),
+        timelineGrid: document.getElementById('timeline-grid')
+    };
 
-    const STATUS_MAP = {
-        operational: { text: "Wszystkie systemy działają", class: "operational" },
-        degraded: { text: "Zdegradowana wydajność", class: "degraded" },
-        error: { text: "Poważna awaria", class: "error" }
+    const STATUS_CONFIG = {
+        operational: {
+            text: "Wszystkie systemy działają",
+            description: "Wszystkie usługi działają bez zakłóceń",
+            serviceText: "Operacyjny",
+            class: "operational"
+        },
+        degraded: {
+            text: "Zdegradowana wydajność",
+            description: "Niektóre usługi mogą działać wolniej",
+            serviceText: "Zdegradowany",
+            class: "degraded"
+        },
+        error: {
+            text: "Wykryto problemy",
+            description: "Wystąpiły problemy z dostępnością usług",
+            serviceText: "Awaria",
+            class: "error"
+        },
+        maintenance: {
+            text: "Planowana konserwacja",
+            description: "Trwają prace konserwacyjne",
+            serviceText: "Konserwacja",
+            class: "maintenance"
+        }
     };
 
     function getTodayString() {
-        const today = new Date();
-        return today.toISOString().split('T')[0]; // YYYY-MM-DD
+        return new Date().toISOString().split('T')[0];
+    }
+
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('pl-PL', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
     }
 
     function getHistory() {
         try {
-            const history = localStorage.getItem('apiStatusHistory');
-            return history ? JSON.parse(history) : {};
+            const history = JSON.parse(localStorage.getItem('apiStatusHistory') || '{}');
+            return history;
         } catch (e) {
-            console.error("Failed to parse history from localStorage", e);
+            console.error("Failed to parse history:", e);
             return {};
         }
     }
 
     function saveHistory(history) {
-        // Usuń stare wpisy, aby historia nie rosła w nieskończoność
         const sortedKeys = Object.keys(history).sort().reverse();
         const cleanedHistory = {};
+        
         for (let i = 0; i < Math.min(sortedKeys.length, DAYS_TO_SHOW); i++) {
-            const key = sortedKeys[i];
-            cleanedHistory[key] = history[key];
+            cleanedHistory[sortedKeys[i]] = history[sortedKeys[i]];
         }
+        
         localStorage.setItem('apiStatusHistory', JSON.stringify(cleanedHistory));
     }
 
-    function renderGrid() {
-        timelineGrid.innerHTML = '';
+    function updateUI(status) {
+        const config = STATUS_CONFIG[status] || STATUS_CONFIG.error;
+        
+        elements.mainStatusText.textContent = config.text;
+        elements.statusDescription.textContent = config.description;
+        elements.statusIcon.className = `status-icon ${config.class}`;
+        elements.serviceStatus.textContent = config.serviceText;
+        elements.serviceStatus.className = `service-status ${config.class}`;
+        elements.mainService.className = `service-item ${config.class}`;
+    }
+
+    function renderTimeline() {
         const history = getHistory();
         const today = new Date();
+        elements.timelineGrid.innerHTML = '';
 
         for (let i = DAYS_TO_SHOW - 1; i >= 0; i--) {
             const date = new Date(today);
             date.setDate(today.getDate() - i);
             const dateString = date.toISOString().split('T')[0];
-
             const status = history[dateString] || 'no-data';
             
             const bar = document.createElement('div');
             bar.className = `timeline-bar ${status}`;
-
+            
             const tooltip = document.createElement('div');
             tooltip.className = 'tooltip';
-            tooltip.innerHTML = `<strong>${dateString}</strong><br>Status: ${status}`;
+            tooltip.innerHTML = `
+                <strong>${formatDate(dateString)}</strong><br>
+                Status: ${STATUS_CONFIG[status]?.serviceText || 'Brak danych'}
+            `;
             
             bar.appendChild(tooltip);
-            timelineGrid.appendChild(bar);
+            elements.timelineGrid.appendChild(bar);
         }
     }
 
-    async function updateStatus() {
-        lastUpdatedText.textContent = `Sprawdzanie...`;
+    async function checkStatus() {
         try {
+            elements.lastUpdated.textContent = 'Sprawdzanie...';
+            
             const response = await fetch(API_URL);
             const data = await response.json();
             
-            const statusInfo = STATUS_MAP[data.status] || { text: "Nieznany status", class: "no-data" };
+            const status = data.status || 'error';
+            updateUI(status);
             
-            mainStatusText.textContent = statusInfo.text;
-            statusIndicator.className = `status-indicator ${statusInfo.class}`;
-
             const history = getHistory();
             const today = getTodayString();
             
-            // Zapisz najgorszy status danego dnia
-            const currentDayStatus = history[today];
-            if (!currentDayStatus || (statusInfo.class === 'error') || (statusInfo.class === 'degraded' && currentDayStatus !== 'error')) {
-                history[today] = statusInfo.class;
+            // Save worst status of the day
+            const currentStatus = history[today];
+            const statusPriority = { operational: 1, degraded: 2, maintenance: 3, error: 4 };
+                    
+            if (!currentStatus || (statusPriority[status] || 4) > (statusPriority[currentStatus] || 0)) {
+                history[today] = status;
+                saveHistory(history);
             }
-
-            saveHistory(history);
-            renderGrid();
-
+            
+            renderTimeline();
+            
         } catch (error) {
-            console.error("Fetch error:", error);
-            mainStatusText.textContent = "Błąd połączenia z API";
-            statusIndicator.className = 'status-indicator error';
-
+            console.error('Status check failed:', error);
+            updateUI('error');
+            
             const history = getHistory();
             history[getTodayString()] = 'error';
             saveHistory(history);
-            renderGrid();
+            renderTimeline();
         } finally {
-            lastUpdatedText.textContent = `Ostatnia aktualizacja: ${new Date().toLocaleTimeString()}`;
+            const now = new Date();
+            elements.lastUpdated.textContent = `Ostatnia aktualizacja: ${now.toLocaleString('pl-PL')}`;
         }
     }
 
-    // Inicjalizacja
-    renderGrid();
-    updateStatus();
-    setInterval(updateStatus, CHECK_INTERVAL);
+    // Initialize
+    renderTimeline();
+    checkStatus();
+    setInterval(checkStatus, CHECK_INTERVAL);
 });
