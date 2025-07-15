@@ -30,6 +30,8 @@ async function fetchFromHenrikApi(urlPath, queryParams = {}) {
             headers: { 'Authorization': config.HENRIKDEV_API_KEY }, 
             timeout: 15000 
         });
+
+        console.log(response)
         
         if (!response.ok) { 
             let errorData; 
@@ -58,8 +60,8 @@ async function fetchAccountDetails(name, tag) {
     return fetchFromHenrikApi(`/valorant/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`); 
 }
 
-async function fetchPlayerMMR(name, tag, region) { 
-    return fetchFromHenrikApi(`/valorant/v3/mmr/${region.toLowerCase()}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`); 
+async function fetchPlayerMMR(region, name, tag) { 
+    return fetchFromHenrikApi(`/valorant/v2/mmr/${region.toLowerCase()}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`); 
 }
 
 // Funkcja dla /daily, używa endpointu v2
