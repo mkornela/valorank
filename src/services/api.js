@@ -30,8 +30,6 @@ async function fetchFromHenrikApi(urlPath, queryParams = {}) {
             headers: { 'Authorization': config.HENRIKDEV_API_KEY }, 
             timeout: 15000 
         });
-
-        console.log(response)
         
         if (!response.ok) { 
             let errorData; 
