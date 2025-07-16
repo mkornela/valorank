@@ -54,6 +54,33 @@ async function fetchFromHenrikApi(urlPath, queryParams = {}) {
     }
 }
 
+// Helper function to deduplicate matches by match ID
+function deduplicateMatches(matches) {
+    if (!Array.isArray(matches)) {
+        return matches;
+    }
+    
+    const seen = new Set();
+    const uniqueMatches = matches.filter(match => {
+        const matchId = match.metadata?.match_id;
+        if (!matchId) return true; // Keep matches without ID (shouldn't happen but safe)
+        
+        if (seen.has(matchId)) {
+            return false; // Skip duplicate
+        }
+        seen.add(matchId);
+        return true;
+    });
+    
+    // Log if duplicates were found
+    if (uniqueMatches.length < matches.length) {
+        const duplicateCount = matches.length - uniqueMatches.length;
+        log.info('DEDUP', `Removed ${duplicateCount} duplicate matches from API response`);
+    }
+    
+    return uniqueMatches;
+}
+
 async function fetchAccountDetails(name, tag) { 
     return fetchFromHenrikApi(`/valorant/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`); 
 }
@@ -103,6 +130,9 @@ async function fetchMatchHistory(name, tag, region, gameMode = 'competitive', to
                 allMatches = allMatches.concat(response.data); 
             } 
         }
+        
+        // Deduplicate matches before sorting
+        allMatches = deduplicateMatches(allMatches);
         
         allMatches.sort((a, b) => new Date(b.metadata.game_start_iso).getTime() - new Date(a.metadata.game_start_iso).getTime());
         log.info('API', `Fetched ${allMatches.length} matches in ${responses.length} requests for ${name}#${tag}`);

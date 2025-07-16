@@ -14,6 +14,36 @@ const asyncHandler = fn => (req, res, next) => {
         .catch(next);
 };
 
+// Helper function to deduplicate matches by match ID
+const deduplicateMatches = (matchHistory) => {
+    if (!matchHistory || !matchHistory.data || !Array.isArray(matchHistory.data)) {
+        return matchHistory;
+    }
+    
+    const seen = new Set();
+    const uniqueMatches = matchHistory.data.filter(match => {
+        const matchId = match.meta?.matchid;
+        if (!matchId) return true; // Keep matches without ID (shouldn't happen but safe)
+        
+        if (seen.has(matchId)) {
+            return false; // Skip duplicate
+        }
+        seen.add(matchId);
+        return true;
+    });
+    
+    // Log if duplicates were found
+    if (uniqueMatches.length < matchHistory.data.length) {
+        const duplicateCount = matchHistory.data.length - uniqueMatches.length;
+        log.info('DEDUP', `Removed ${duplicateCount} duplicate matches from API response`);
+    }
+    
+    return {
+        ...matchHistory,
+        data: uniqueMatches
+    };
+};
+
 router.get('/api/rank', asyncHandler(async (req, res, next) => {
     const { STATS_PLAYER_NAME, STATS_PLAYER_TAG, STATS_PLAYER_REGION } = require('../config');
     
@@ -60,7 +90,7 @@ router.get('/wl/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
     }
     
-    const [account, history, mmrHistory] = await Promise.all([
+    const [account, rawHistory, mmrHistory] = await Promise.all([
         fetchAccountDetails(name, tag), 
         fetchMatchHistory(name, tag, region, 'competitive', 20),
         fetchMMRHistory(name, tag, region)
@@ -69,6 +99,9 @@ router.get('/wl/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     if (!account.data?.puuid) {
         return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza.');
     }
+    
+    // Deduplicate matches before processing
+    const history = deduplicateMatches(rawHistory);
     
     const mmrHistoryArray = mmrHistory?.data || [];
     const { startTime, endTime } = getSessionTimeRange(sessionStart ? parseInt(sessionStart, 10) * 1000 : null, resetTime);
@@ -87,7 +120,7 @@ router.get('/advanced_wl/:name/:tag/:region', asyncHandler(async (req, res, next
         return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
     }
     
-    const [account, history, mmrHistory] = await Promise.all([ 
+    const [account, rawHistory, mmrHistory] = await Promise.all([ 
         fetchAccountDetails(name, tag), 
         fetchMatchHistory(name, tag, region, 'competitive', 25), 
         fetchMMRHistory(name, tag, region)
@@ -96,6 +129,9 @@ router.get('/advanced_wl/:name/:tag/:region', asyncHandler(async (req, res, next
     if (!account.data?.puuid) {
         return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza.');
     }
+    
+    // Deduplicate matches before processing
+    const history = deduplicateMatches(rawHistory);
     
     const { startTime, endTime } = getSessionTimeRange(null, resetTime);
     const mmrHistoryArray = mmrHistory?.data || [];
@@ -119,7 +155,7 @@ router.get('/daily/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
     }
 
-    const [account, history, mmr, mmrHistory] = await Promise.all([
+    const [account, rawHistory, mmr, mmrHistory] = await Promise.all([
         fetchAccountDetails(name, tag),
         fetchMatchHistory(name, tag, region, 'competitive', 25),
         fetchPlayerMMR(name, tag, region),
@@ -132,6 +168,9 @@ router.get('/daily/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     if (!mmr.data?.current_data) {
         return res.status(404).type('text/plain').send('Błąd: Brak danych rankingowych dla gracza.');
     }
+
+    // Deduplicate matches before processing
+    const history = deduplicateMatches(rawHistory);
 
     const { startTime, endTime } = getSessionTimeRange(null, resetTime);
     const mmrHistoryArray = mmrHistory?.data?.history || [];
