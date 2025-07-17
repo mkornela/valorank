@@ -16,9 +16,25 @@ const VALID_REGIONS = ['na', 'eu', 'ap', 'kr', 'latam', 'br'];
 const RADIANT_BASE_THRESHOLD = 550;
 const MAX_MATCHES_PER_REQUEST = 10;
 
+const TEAMS = {
+    'BBL Esports': 'BBL',
+    'FNATIC': 'FNC',
+    'FUT Esports': 'FUT',
+    'GIANTX': 'GIANTX',
+    'Karmine Corp': 'KC',
+    'KOI': 'KOI',
+    'Natus Vincere': 'NAVI',
+    'Team Heretics': 'TH',
+    'Team Liquid': 'Liquid',
+    'Team Vitality': 'Vitality',
+    'Gentle Mates': 'M8',
+    'Apeks': 'APEKS'
+}
+
 module.exports = {
     RANK_TIERS,
     VALID_REGIONS,
     RADIANT_BASE_THRESHOLD,
-    MAX_MATCHES_PER_REQUEST
+    MAX_MATCHES_PER_REQUEST,
+    TEAMS
 };

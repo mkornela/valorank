@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { VALID_REGIONS, RANK_TIERS } = require('../constants');
+const { VALID_REGIONS, RANK_TIERS, TEAMS } = require('../constants');
 const { logToDiscord } = require('../utils/discord');
 const { getSessionTimeRange, formatMatchDateTimeShort, getTimeUntilMatch, formatMatchDateTimeShortHour } = require('../utils/time');
 const { fetchAccountDetails, fetchMatchHistory, fetchPlayerMMR, fetchLeaderboard, fetchMMRHistory, fetchMMRHistoryDaily } = require('../services/api');
@@ -289,12 +289,14 @@ router.get('/dailymatches/:event', asyncHandler(async (req, res, next) => {
 
     const matchesStrings = dailyMatches.map(match => {
         const time = formatMatchDateTimeShortHour(match.date, match.time) || 'brak godziny';
-        const teamA = match.teams[0]?.name || 'TBD';
-        const teamB = match.teams[1]?.name || 'TBD';
-        return `${teamA} vs ${teamB} o ${time}`;
+        const teamA = TEAMS[match.teams[0]?.name] || 'TBD';
+        const teamB = TEAMS[match.teams[1]?.name] || 'TBD';
+        console.log(match.teams[0]?.name, TEAMS[match.teams[0]?.name])
+        console.log(match.teams[1]?.name, TEAMS[match.teams[1]?.name])
+        return `${teamA} vs ${teamB} (${time})`;
     });
 
-    const result = `Dzisiejsze mecze na "${event}": ${matchesStrings.join(' | ')}`;
+    const result = `Dzisiejsze mecze: ${matchesStrings.join(' | ')}`;
 
     res.type('text/plain').send(result);
     logToDiscord({
