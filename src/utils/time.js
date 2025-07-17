@@ -1,7 +1,8 @@
-const { zonedTimeToUtc, utcToZonedTime, format } = require('date-fns-tz');
+const { fromZonedTime, toZonedTime, format } = require('date-fns-tz');
 const { pl } = require('date-fns/locale');
 
 const POLAND_TIME_ZONE = 'Europe/Warsaw';
+
 
 function parseMatchDateTimeToUtc(matchDate, matchTime) {
     const dateParts = matchDate.split(', ');
@@ -26,7 +27,7 @@ function parseMatchDateTimeToUtc(matchDate, matchTime) {
 
     const naiveDate = new Date(year, monthIndex, day, hour24, minutes, 0);
 
-    return zonedTimeToUtc(naiveDate, POLAND_TIME_ZONE);
+    return fromZonedTime(naiveDate, POLAND_TIME_ZONE);
 }
 
 function getSessionTimeRange(sinceTimestampMs, resetTimeParam) {
@@ -42,24 +43,25 @@ function getSessionTimeRange(sinceTimestampMs, resetTimeParam) {
         if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
             throw new Error('Invalid resetTime. Hours must be 00-23, minutes must be 00-59.');
         }
-
-        const nowInPoland = utcToZonedTime(nowUtc, POLAND_TIME_ZONE);
+        
+        const nowInPoland = toZonedTime(nowUtc, POLAND_TIME_ZONE);
         
         let resetTimeTodayInPoland = new Date(nowInPoland.getFullYear(), nowInPoland.getMonth(), nowInPoland.getDate(), hours, minutes, 0);
 
         if (nowInPoland.getTime() < resetTimeTodayInPoland.getTime()) {
             resetTimeTodayInPoland.setDate(resetTimeTodayInPoland.getDate() - 1);
         }
-
-        const startTime = zonedTimeToUtc(resetTimeTodayInPoland, POLAND_TIME_ZONE);
+        
+        const startTime = fromZonedTime(resetTimeTodayInPoland, POLAND_TIME_ZONE);
         return { startTime, endTime: nowUtc };
 
     } else if (sinceTimestampMs && !isNaN(sinceTimestampMs) && sinceTimestampMs > 0) {
         return { startTime: new Date(sinceTimestampMs), endTime: nowUtc };
     } else {
-        const nowInPoland = utcToZonedTime(nowUtc, POLAND_TIME_ZONE);
+        const nowInPoland = toZonedTime(nowUtc, POLAND_TIME_ZONE);
         const startOfTodayInPoland = new Date(nowInPoland.getFullYear(), nowInPoland.getMonth(), nowInPoland.getDate(), 0, 0, 0);
-        const startTime = zonedTimeToUtc(startOfTodayInPoland, POLAND_TIME_ZONE);
+        
+        const startTime = fromZonedTime(startOfTodayInPoland, POLAND_TIME_ZONE);
         return { startTime, endTime: nowUtc };
     }
 }
