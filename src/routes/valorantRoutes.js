@@ -220,24 +220,31 @@ router.get('/getrank/:position', asyncHandler(async (req, res, next) => {
 
 router.get('/nextmatch/:event', asyncHandler(async (req, res, next) => {
     const { event } = req.params;
-    let result;
+    const matches = await vlr.getUpcomingMatches();
+    const nextMatch = matches.data.find(match => 
+        match.event.name.toLowerCase() === event.toLowerCase()
+    );
+    if (!nextMatch) {
+        const result = `Nie znaleziono nadchodzących meczy dla wydarzenia: "${event}". Sprawdź, czy nazwa jest poprawna.`;
+        res.status(404).type('text/plain').send(result);
+        logToDiscord({ 
+            title: 'API Call Info: `/nextmatch` - Not Found', 
+            color: 0xFFA500,
+            fields: [{ name: 'Event Searched', value: `\`${event}\``, inline: true }], 
+            timestamp: new Date().toISOString(), 
+            footer: { text: `IP: ${req.ip}` } 
+        });
+        return;
+    }
 
-    const matches = await vlr.getUpcomingMatches(); let games = [];
-    matches.data.forEach(match => {
-        if(match.event.name == event) //VCT 2025: EMEA Stage 2 as an example
-            games.push({
-                id: match.id,
-                date: match.date,
-                time: match.time,
-                team1: match.teams[0].name,
-                team2: match.teams[1].name
-            })
-    })
+    const date = formatMatchDateTimeShort(nextMatch.date, nextMatch.time);
+    const timeUntil = getTimeUntilMatch(nextMatch.date, nextMatch.time);
 
-    let date = formatMatchDateTimeShort(games[0].date, games[0].time)
-    result = `Następny mecz na "${event}" to: ${games[0].team1} vs ${games[0].team2} za ${getTimeUntilMatch(games[0].date, games[0].time)} (${date})`
+    const result = `Następny mecz na "${event}" to: ${nextMatch.teams[0].name} vs ${nextMatch.teams[1].name} za ${timeUntil} (${date})`;
+
     res.type('text/plain').send(result);
-    logToDiscord({ title: 'API Call Success: `/nextmatch`', color: 0x00FF00, fields: [{ name: 'Event', value: `\`${event}\``, inline: true }, { name: 'Result', value: `\`${result}\``, inline: false }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
+    logToDiscord({ title: 'API Call Success: `/nextmatch`', color: 0x00FF00, fields: [ { name: 'Event', value: `\`${event}\``, inline: true }, { name: 'Result', value: `\`${result}\``, inline: false } ], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
+
 }));
 
 module.exports = router;

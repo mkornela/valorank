@@ -1,235 +1,90 @@
-function getPolandTimezoneOffset(date) {
-    const utcTime = new Date(date.toLocaleString('en-US', { timeZone: 'UTC' }));
-    const polandTime = new Date(date.toLocaleString('en-US', { timeZone: 'Europe/Warsaw' }));
-    return polandTime.getTime() - utcTime.getTime();
+const { zonedTimeToUtc, utcToZonedTime, format } = require('date-fns-tz');
+const { pl } = require('date-fns/locale');
+
+const POLAND_TIME_ZONE = 'Europe/Warsaw';
+
+function parseMatchDateTimeToUtc(matchDate, matchTime) {
+    const dateParts = matchDate.split(', ');
+    const monthDay = dateParts[1];
+    const year = dateParts[2];
+
+    const timeParts = matchTime.split(' ');
+    const time = timeParts[0];
+    const period = timeParts[1];
+
+    const [hours, minutes] = time.split(':');
+    let hour24 = parseInt(hours, 10);
+
+    if (period === 'PM' && hour24 !== 12) {
+        hour24 += 12;
+    } else if (period === 'AM' && hour24 === 12) {
+        hour24 = 0;
+    }
+
+    const monthIndex = new Date(Date.parse(monthDay.split(' ')[0] + " 1, 2012")).getMonth();
+    const day = parseInt(monthDay.split(' ')[1], 10);
+
+    const naiveDate = new Date(year, monthIndex, day, hour24, minutes, 0);
+
+    return zonedTimeToUtc(naiveDate, POLAND_TIME_ZONE);
 }
 
 function getSessionTimeRange(sinceTimestampMs, resetTimeParam) {
-    const now = new Date();
-    let startTime;
-    
+    const nowUtc = new Date();
+
     if (resetTimeParam) {
         if (!/^\d{4}$/.test(resetTimeParam)) {
             throw new Error('Invalid resetTime format. Use HHMM format (e.g., 0800 for 8:00 AM).');
         }
-        
         const hours = parseInt(resetTimeParam.substring(0, 2), 10);
         const minutes = parseInt(resetTimeParam.substring(2, 4), 10);
-        
+
         if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
             throw new Error('Invalid resetTime. Hours must be 00-23, minutes must be 00-59.');
         }
+
+        const nowInPoland = utcToZonedTime(nowUtc, POLAND_TIME_ZONE);
         
-        const nowInPoland = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Warsaw' }));
-        
-        const todayInPoland = new Date(nowInPoland);
-        todayInPoland.setHours(hours, minutes, 0, 0);
-        
-        let resetTimeInPoland;
-        
-        if (nowInPoland.getTime() < todayInPoland.getTime()) {
-            resetTimeInPoland = new Date(todayInPoland);
-            resetTimeInPoland.setDate(resetTimeInPoland.getDate() - 1);
-        } else {
-            resetTimeInPoland = todayInPoland;
+        let resetTimeTodayInPoland = new Date(nowInPoland.getFullYear(), nowInPoland.getMonth(), nowInPoland.getDate(), hours, minutes, 0);
+
+        if (nowInPoland.getTime() < resetTimeTodayInPoland.getTime()) {
+            resetTimeTodayInPoland.setDate(resetTimeTodayInPoland.getDate() - 1);
         }
-        
-        startTime = new Date(Date.UTC(
-            resetTimeInPoland.getFullYear(),
-            resetTimeInPoland.getMonth(),
-            resetTimeInPoland.getDate(),
-            resetTimeInPoland.getHours(),
-            resetTimeInPoland.getMinutes(),
-            0,
-            0
-        ));
-        
-        const polandOffset = getPolandTimezoneOffset(startTime);
-        startTime = new Date(startTime.getTime() - polandOffset);
+
+        const startTime = zonedTimeToUtc(resetTimeTodayInPoland, POLAND_TIME_ZONE);
+        return { startTime, endTime: nowUtc };
+
+    } else if (sinceTimestampMs && !isNaN(sinceTimestampMs) && sinceTimestampMs > 0) {
+        return { startTime: new Date(sinceTimestampMs), endTime: nowUtc };
+    } else {
+        const nowInPoland = utcToZonedTime(nowUtc, POLAND_TIME_ZONE);
+        const startOfTodayInPoland = new Date(nowInPoland.getFullYear(), nowInPoland.getMonth(), nowInPoland.getDate(), 0, 0, 0);
+        const startTime = zonedTimeToUtc(startOfTodayInPoland, POLAND_TIME_ZONE);
+        return { startTime, endTime: nowUtc };
     }
-    else if (sinceTimestampMs && !isNaN(sinceTimestampMs) && sinceTimestampMs > 0) {
-        startTime = new Date(sinceTimestampMs);
-    }
-    else {
-        const polandDate = new Date(now.toLocaleDateString('en-CA', { timeZone: 'Europe/Warsaw' }));
-        startTime = new Date(polandDate.getFullYear(), polandDate.getMonth(), polandDate.getDate(), 0, 0, 0, 0);
-    }
-    
-    return { startTime, endTime: now };
 }
 
 function formatMatchDateTime(matchDate, matchTime) {
-    const dateParts = matchDate.split(', ');
-    const monthDay = dateParts[1];
-    const year = dateParts[2];
-    
-    const timeParts = matchTime.split(' ');
-    const time = timeParts[0];
-    const period = timeParts[1];
-    
-    const [hours, minutes] = time.split(':');
-    let hour24 = parseInt(hours, 10);
-    
-    if (period === 'PM' && hour24 !== 12) {
-        hour24 += 12;
-    } else if (period === 'AM' && hour24 === 12) {
-        hour24 = 0;
-    }
-    
-    const fullDateTime = new Date(`${monthDay}, ${year} ${hour24}:${minutes}:00`);
-    
-    const polishFormatter = new Intl.DateTimeFormat('pl-PL', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'Europe/Warsaw'
+    const utcDate = parseMatchDateTimeToUtc(matchDate, matchTime);
+    return format(utcDate, "EEEE, d MMMM yyyy, HH:mm", {
+        timeZone: POLAND_TIME_ZONE,
+        locale: pl
     });
-    
-    return polishFormatter.format(fullDateTime);
 }
 
 function formatMatchDateTimeShort(matchDate, matchTime) {
-    const dateParts = matchDate.split(', ');
-    const monthDay = dateParts[1];
-    const year = dateParts[2];
-    
-    const timeParts = matchTime.split(' ');
-    const time = timeParts[0];
-    const period = timeParts[1];
-    
-    const [hours, minutes] = time.split(':');
-    let hour24 = parseInt(hours, 10);
-    
-    if (period === 'PM' && hour24 !== 12) {
-        hour24 += 12;
-    } else if (period === 'AM' && hour24 === 12) {
-        hour24 = 0;
-    }
-    
-    const fullDateTime = new Date(`${monthDay}, ${year} ${hour24}:${minutes}:00`);
-    
-    const polishFormatter = new Intl.DateTimeFormat('pl-PL', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'Europe/Warsaw'
+    const utcDate = parseMatchDateTimeToUtc(matchDate, matchTime);
+    return format(utcDate, 'dd.MM.yyyy, HH:mm', {
+        timeZone: POLAND_TIME_ZONE
     });
-    
-    return polishFormatter.format(fullDateTime);
 }
 
 function getTimeUntilMatch(matchDate, matchTime) {
-    const dateParts = matchDate.split(', ');
-    const monthDay = dateParts[1];
-    const year = dateParts[2];
-    
-    const timeParts = matchTime.split(' ');
-    const time = timeParts[0];
-    const period = timeParts[1];
-    
-    const [hours, minutes] = time.split(':');
-    let hour24 = parseInt(hours, 10);
-    
-    if (period === 'PM' && hour24 !== 12) {
-        hour24 += 12;
-    } else if (period === 'AM' && hour24 === 12) {
-        hour24 = 0;
-    }
-    
-    // Tworzymy Date object i interpretujemy jako lokalny czas
-    const matchDateTime = new Date(`${monthDay}, ${year} ${hour24}:${minutes}:00`);
-    
-    // Pobieramy aktualny czas w strefie czasowej Polski
-    const now = new Date();
-    const nowInPoland = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Warsaw' }));
-    
-    // Konwertujemy czas meczu na strefę czasową Polski
-    const matchInPoland = new Date(matchDateTime.toLocaleString('en-US', { timeZone: 'Europe/Warsaw' }));
-    
-    // Obliczamy różnicę w milisekundach
-    const diffMs = matchInPoland.getTime() - nowInPoland.getTime();
-    
-    if (diffMs < 0) {
-        return "Mecz aktualnie trwa!";
-    }
-    
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
-    const remainingHours = diffHours % 24;
-    const remainingMinutes = diffMinutes % 60;
-    
-    if (diffDays > 0) {
-        if (remainingHours > 0) {
-            const dayText = diffDays === 1 ? "dzień" : "dni";
-            const hourText = remainingHours === 1 ? "godzina" : 
-                           remainingHours < 5 ? "godziny" : "godzin";
-            return `${diffDays} ${dayText}, ${remainingHours} ${hourText}`;
-        } else {
-            const dayText = diffDays === 1 ? "dzień" : "dni";
-            return `${diffDays} ${dayText}`;
-        }
-    } else if (diffHours > 0) {
-        if (remainingMinutes > 0) {
-            const hourText = diffHours === 1 ? "godzina" : 
-                           diffHours < 5 ? "godziny" : "godzin";
-            const minuteText = remainingMinutes === 1 ? "minuta" : 
-                             remainingMinutes < 5 ? "minuty" : "minut";
-            return `${diffHours} ${hourText}, ${remainingMinutes} ${minuteText}`;
-        } else {
-            const hourText = diffHours === 1 ? "godzina" : 
-                           diffHours < 5 ? "godziny" : "godzin";
-            return `${diffHours} ${hourText}`;
-        }
-    } else {
-        const minuteText = diffMinutes === 1 ? "minuta" : 
-                         diffMinutes < 5 ? "minuty" : "minut";
-        return `${diffMinutes} ${minuteText}`;
-    }
-}
+    const matchDateTimeUtc = parseMatchDateTimeToUtc(matchDate, matchTime);
+    const nowUtc = new Date();
 
-// Alternatywna funkcja która używa twojej funkcji getPolandTimezoneOffset
-function getTimeUntilMatchPrecise(matchDate, matchTime) {
-    const dateParts = matchDate.split(', ');
-    const monthDay = dateParts[1];
-    const year = dateParts[2];
-    
-    const timeParts = matchTime.split(' ');
-    const time = timeParts[0];
-    const period = timeParts[1];
-    
-    const [hours, minutes] = time.split(':');
-    let hour24 = parseInt(hours, 10);
-    
-    if (period === 'PM' && hour24 !== 12) {
-        hour24 += 12;
-    } else if (period === 'AM' && hour24 === 12) {
-        hour24 = 0;
-    }
-    
-    // Tworzymy Date object jako UTC
-    const matchDateTime = new Date(`${monthDay}, ${year} ${hour24}:${minutes}:00`);
-    
-    // Pobieramy aktualny czas
-    const now = new Date();
-    
-    // Używamy twojej funkcji do obliczenia offsetu
-    const matchOffset = getPolandTimezoneOffset(matchDateTime);
-    const nowOffset = getPolandTimezoneOffset(now);
-    
-    // Konwertujemy oba czasy na czas Polski
-    const matchInPoland = new Date(matchDateTime.getTime() + matchOffset);
-    const nowInPoland = new Date(now.getTime() + nowOffset);
-    
-    // Obliczamy różnicę w milisekundach
-    const diffMs = matchInPoland.getTime() - nowInPoland.getTime();
-    
+    const diffMs = matchDateTimeUtc.getTime() - nowUtc.getTime();
+
     if (diffMs < 0) {
         return "Mecz aktualnie trwa!";
     }
@@ -241,40 +96,31 @@ function getTimeUntilMatchPrecise(matchDate, matchTime) {
     const remainingHours = diffHours % 24;
     const remainingMinutes = diffMinutes % 60;
     
+    const formatUnit = (value, units) => {
+        if (value === 1) return units[0];
+        const lastDigit = value % 10;
+        const lastTwoDigits = value % 100;
+        if (lastTwoDigits >= 12 && lastTwoDigits <= 14) return units[2];
+        if (lastDigit >= 2 && lastDigit <= 4) return units[1];
+        return units[2];
+    };
+
+    const dayText = formatUnit(diffDays, ["dzień", "dni", "dni"]);
+    const hourText = formatUnit(remainingHours, ["godzina", "godziny", "godzin"]);
+    const minuteText = formatUnit(remainingMinutes, ["minuta", "minuty", "minut"]);
+    
     if (diffDays > 0) {
-        if (remainingHours > 0) {
-            const dayText = diffDays === 1 ? "dzień" : "dni";
-            const hourText = remainingHours === 1 ? "godzina" : 
-                           remainingHours < 5 ? "godziny" : "godzin";
-            return `${diffDays} ${dayText}, ${remainingHours} ${hourText}`;
-        } else {
-            const dayText = diffDays === 1 ? "dzień" : "dni";
-            return `${diffDays} ${dayText}`;
-        }
+        return remainingHours > 0 ? `${diffDays} ${dayText}, ${remainingHours} ${hourText}` : `${diffDays} ${dayText}`;
     } else if (diffHours > 0) {
-        if (remainingMinutes > 0) {
-            const hourText = diffHours === 1 ? "godzina" : 
-                           diffHours < 5 ? "godziny" : "godzin";
-            const minuteText = remainingMinutes === 1 ? "minuta" : 
-                             remainingMinutes < 5 ? "minuty" : "minut";
-            return `${diffHours} ${hourText}, ${remainingMinutes} ${minuteText}`;
-        } else {
-            const hourText = diffHours === 1 ? "godzina" : 
-                           diffHours < 5 ? "godziny" : "godzin";
-            return `${diffHours} ${hourText}`;
-        }
+        return remainingMinutes > 0 ? `${diffHours} ${hourText}, ${remainingMinutes} ${minuteText}` : `${diffHours} ${hourText}`;
     } else {
-        const minuteText = diffMinutes === 1 ? "minuta" : 
-                         diffMinutes < 5 ? "minuty" : "minut";
-        return `${diffMinutes} ${minuteText}`;
+        return `${diffMinutes <= 0 ? 1 : diffMinutes} ${minuteText}`;
     }
 }
 
 module.exports = {
-    getPolandTimezoneOffset,
     getSessionTimeRange,
     formatMatchDateTime,
     formatMatchDateTimeShort,
-    getTimeUntilMatch,
-    getTimeUntilMatchPrecise
+    getTimeUntilMatch
 };
