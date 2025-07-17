@@ -25,9 +25,9 @@ function parseMatchDateTimeToUtc(matchDate, matchTime) {
     const monthIndex = new Date(Date.parse(monthDay.split(' ')[0] + " 1, 2012")).getMonth();
     const day = parseInt(monthDay.split(' ')[1], 10);
 
-    const naiveDate = new Date(year, monthIndex, day, hour24, minutes, 0);
+    const localDateTimeString = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour24).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
 
-    return fromZonedTime(naiveDate, POLAND_TIME_ZONE);
+    return fromZonedTime(localDateTimeString, POLAND_TIME_ZONE);
 }
 
 function getSessionTimeRange(sinceTimestampMs, resetTimeParam) {
