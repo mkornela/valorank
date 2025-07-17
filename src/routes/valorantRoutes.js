@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { VALID_REGIONS, RANK_TIERS, TEAMS } = require('../constants');
+const { VALID_REGIONS, RANK_TIERS, TEAMS, EVENTS } = require('../constants');
 const { logToDiscord } = require('../utils/discord');
 const { getSessionTimeRange, formatMatchDateTimeShort, getTimeUntilMatch, formatMatchDateTimeShortHour } = require('../utils/time');
 const { fetchAccountDetails, fetchMatchHistory, fetchPlayerMMR, fetchLeaderboard, fetchMMRHistory, fetchMMRHistoryDaily } = require('../services/api');
@@ -291,8 +291,6 @@ router.get('/dailymatches/:event', asyncHandler(async (req, res, next) => {
         const time = formatMatchDateTimeShortHour(match.date, match.time) || 'brak godziny';
         const teamA = TEAMS[match.teams[0]?.name] || 'TBD';
         const teamB = TEAMS[match.teams[1]?.name] || 'TBD';
-        console.log(match.teams[0]?.name, TEAMS[match.teams[0]?.name])
-        console.log(match.teams[1]?.name, TEAMS[match.teams[1]?.name])
         return `${time} ${teamA} vs ${teamB}`;
     });
 

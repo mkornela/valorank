@@ -31,10 +31,15 @@ const TEAMS = {
     'Apeks': 'APEKS'
 }
 
+const EVENTS = {
+    'VCT 2025: EMEA Stage 2': 'VCT EMEA Stage 2'
+}
+
 module.exports = {
     RANK_TIERS,
     VALID_REGIONS,
     RADIANT_BASE_THRESHOLD,
     MAX_MATCHES_PER_REQUEST,
-    TEAMS
+    TEAMS,
+    EVENTS
 };
