@@ -141,10 +141,94 @@ function getTimeUntilMatch(matchDate, matchTime) {
         hour24 = 0;
     }
     
+    // Tworzymy Date object i interpretujemy jako lokalny czas
     const matchDateTime = new Date(`${monthDay}, ${year} ${hour24}:${minutes}:00`);
+    
+    // Pobieramy aktualny czas w strefie czasowej Polski
+    const now = new Date();
+    const nowInPoland = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Warsaw' }));
+    
+    // Konwertujemy czas meczu na strefę czasową Polski
+    const matchInPoland = new Date(matchDateTime.toLocaleString('en-US', { timeZone: 'Europe/Warsaw' }));
+    
+    // Obliczamy różnicę w milisekundach
+    const diffMs = matchInPoland.getTime() - nowInPoland.getTime();
+    
+    if (diffMs < 0) {
+        return "Mecz aktualnie trwa!";
+    }
+    
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    const remainingHours = diffHours % 24;
+    const remainingMinutes = diffMinutes % 60;
+    
+    if (diffDays > 0) {
+        if (remainingHours > 0) {
+            const dayText = diffDays === 1 ? "dzień" : "dni";
+            const hourText = remainingHours === 1 ? "godzina" : 
+                           remainingHours < 5 ? "godziny" : "godzin";
+            return `${diffDays} ${dayText}, ${remainingHours} ${hourText}`;
+        } else {
+            const dayText = diffDays === 1 ? "dzień" : "dni";
+            return `${diffDays} ${dayText}`;
+        }
+    } else if (diffHours > 0) {
+        if (remainingMinutes > 0) {
+            const hourText = diffHours === 1 ? "godzina" : 
+                           diffHours < 5 ? "godziny" : "godzin";
+            const minuteText = remainingMinutes === 1 ? "minuta" : 
+                             remainingMinutes < 5 ? "minuty" : "minut";
+            return `${diffHours} ${hourText}, ${remainingMinutes} ${minuteText}`;
+        } else {
+            const hourText = diffHours === 1 ? "godzina" : 
+                           diffHours < 5 ? "godziny" : "godzin";
+            return `${diffHours} ${hourText}`;
+        }
+    } else {
+        const minuteText = diffMinutes === 1 ? "minuta" : 
+                         diffMinutes < 5 ? "minuty" : "minut";
+        return `${diffMinutes} ${minuteText}`;
+    }
+}
+
+// Alternatywna funkcja która używa twojej funkcji getPolandTimezoneOffset
+function getTimeUntilMatchPrecise(matchDate, matchTime) {
+    const dateParts = matchDate.split(', ');
+    const monthDay = dateParts[1];
+    const year = dateParts[2];
+    
+    const timeParts = matchTime.split(' ');
+    const time = timeParts[0];
+    const period = timeParts[1];
+    
+    const [hours, minutes] = time.split(':');
+    let hour24 = parseInt(hours, 10);
+    
+    if (period === 'PM' && hour24 !== 12) {
+        hour24 += 12;
+    } else if (period === 'AM' && hour24 === 12) {
+        hour24 = 0;
+    }
+    
+    // Tworzymy Date object jako UTC
+    const matchDateTime = new Date(`${monthDay}, ${year} ${hour24}:${minutes}:00`);
+    
+    // Pobieramy aktualny czas
     const now = new Date();
     
-    const diffMs = matchDateTime.getTime() - now.getTime();
+    // Używamy twojej funkcji do obliczenia offsetu
+    const matchOffset = getPolandTimezoneOffset(matchDateTime);
+    const nowOffset = getPolandTimezoneOffset(now);
+    
+    // Konwertujemy oba czasy na czas Polski
+    const matchInPoland = new Date(matchDateTime.getTime() + matchOffset);
+    const nowInPoland = new Date(now.getTime() + nowOffset);
+    
+    // Obliczamy różnicę w milisekundach
+    const diffMs = matchInPoland.getTime() - nowInPoland.getTime();
     
     if (diffMs < 0) {
         return "Mecz aktualnie trwa!";
@@ -191,5 +275,6 @@ module.exports = {
     getSessionTimeRange,
     formatMatchDateTime,
     formatMatchDateTimeShort,
-    getTimeUntilMatch
+    getTimeUntilMatch,
+    getTimeUntilMatchPrecise
 };
