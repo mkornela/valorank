@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { VALID_REGIONS, RANK_TIERS } = require('../constants');
 const { logToDiscord } = require('../utils/discord');
-const { getSessionTimeRange, formatMatchDateTimeShort, getTimeUntilMatch } = require('../utils/time');
+const { getSessionTimeRange, formatMatchDateTimeShort, getTimeUntilMatch, formatMatchDateTimeShortHour } = require('../utils/time');
 const { fetchAccountDetails, fetchMatchHistory, fetchPlayerMMR, fetchLeaderboard, fetchMMRHistory, fetchMMRHistoryDaily } = require('../services/api');
 const { findPlayerByRank } = require('../data/leaderboard');
 const { calculateRRToGoal, calculateSessionStats } = require('../services/game');
@@ -103,7 +103,6 @@ router.get('/wl/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza.');
     }
     
-    // Deduplicate matches before processing
     const history = deduplicateMatches(rawHistory);
     
     const mmrHistoryArray = mmrHistory?.data || [];
@@ -133,7 +132,6 @@ router.get('/advanced_wl/:name/:tag/:region', asyncHandler(async (req, res, next
         return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza.');
     }
     
-    // Deduplicate matches before processing
     const history = deduplicateMatches(rawHistory);
     
     const { startTime, endTime } = getSessionTimeRange(null, resetTime);
@@ -172,7 +170,6 @@ router.get('/daily/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         return res.status(404).type('text/plain').send('Błąd: Brak danych rankingowych dla gracza.');
     }
 
-    // Deduplicate matches before processing
     const history = deduplicateMatches(rawHistory);
 
     const { startTime, endTime } = getSessionTimeRange(null, resetTime);
@@ -245,6 +242,71 @@ router.get('/nextmatch/:event', asyncHandler(async (req, res, next) => {
     res.type('text/plain').send(result);
     logToDiscord({ title: 'API Call Success: `/nextmatch`', color: 0x00FF00, fields: [ { name: 'Event', value: `\`${event}\``, inline: true }, { name: 'Result', value: `\`${result}\``, inline: false } ], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
 
+}));
+
+router.get('/dailymatches/:event', asyncHandler(async (req, res, next) => {
+    const { event } = req.params;
+    const matches = await vlr.getUpcomingMatches();
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const dailyMatches = matches.data.filter(match => {
+        if (!match.event?.name || !match.date) {
+            return false;
+        }
+        if (match.event.name.toLowerCase() !== event.toLowerCase()) {
+            return false;
+        }
+
+        const matchDate = new Date(match.date);
+        if (isNaN(matchDate.getTime())) {
+            return false;
+        }
+        matchDate.setHours(0, 0, 0, 0);
+
+        return matchDate.getTime() === today.getTime();
+    });
+
+    if (dailyMatches.length === 0) {
+        const result = `Nie znaleziono na dzisiaj żadnych meczy dla wydarzenia: "${event}".`;
+        res.status(404).type('text/plain').send(result);
+        logToDiscord({
+            title: 'API Call Info: `/dailymatches` - Not Found',
+            color: 0xFFA500,
+            fields: [{ name: 'Event Searched', value: `\`${event}\``, inline: true }],
+            timestamp: new Date().toISOString(),
+            footer: { text: `IP: ${req.ip}` }
+        });
+        return;
+    }
+
+    dailyMatches.sort((a, b) => {
+        const timeA = a.time?.replace(':', '') || '0';
+        const timeB = b.time?.replace(':', '') || '0';
+        return parseInt(timeA) - parseInt(timeB);
+    });
+
+    const matchesStrings = dailyMatches.map(match => {
+        const time = formatMatchDateTimeShortHour(match.date, match.time) || 'brak godziny';
+        const teamA = match.teams[0]?.name || 'TBD';
+        const teamB = match.teams[1]?.name || 'TBD';
+        return `${teamA} vs ${teamB} o ${time}`;
+    });
+
+    const result = `Dzisiejsze mecze na "${event}": ${matchesStrings.join(' | ')}`;
+
+    res.type('text/plain').send(result);
+    logToDiscord({
+        title: 'API Call Success: `/dailymatches`',
+        color: 0x00FF00,
+        fields: [
+            { name: 'Event', value: `\`${event}\``, inline: true },
+            { name: 'Result', value: `\`${result}\``, inline: false }
+        ],
+        timestamp: new Date().toISOString(),
+        footer: { text: `IP: ${req.ip}` }
+    });
 }));
 
 module.exports = router;

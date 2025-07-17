@@ -84,6 +84,13 @@ function formatMatchDateTimeShort(matchDate, matchTime) {
     });
 }
 
+function formatMatchDateTimeShortHour(matchDate, matchTime) {
+    const utcDate = parseMatchDateTimeToUtc(matchDate, matchTime);
+    return format(utcDate, 'HH:mm', {
+        timeZone: POLAND_TIME_ZONE
+    });
+}
+
 function getTimeUntilMatch(matchDate, matchTime) {
     const matchDateTimeUtc = parseMatchDateTimeToUtc(matchDate, matchTime);
     const nowUtc = new Date();
@@ -127,5 +134,6 @@ module.exports = {
     getSessionTimeRange,
     formatMatchDateTime,
     formatMatchDateTimeShort,
-    getTimeUntilMatch
+    getTimeUntilMatch,
+    formatMatchDateTimeShortHour
 };
