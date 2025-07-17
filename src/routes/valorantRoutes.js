@@ -224,7 +224,6 @@ router.get('/nextmatch/:event', asyncHandler(async (req, res, next) => {
     const nextMatch = matches.data.find(match => 
         match.event.name.toLowerCase() === event.toLowerCase()
     );
-    console.log(nextMatch)
     if (!nextMatch) {
         const result = `Nie znaleziono nadchodzących meczy dla wydarzenia: "${event}". Sprawdź, czy nazwa jest poprawna.`;
         res.status(404).type('text/plain').send(result);
