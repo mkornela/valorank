@@ -5,6 +5,8 @@ const POLAND_TIME_ZONE = 'Europe/Warsaw';
 
 
 function parseMatchDateTimeToUtc(matchDate, matchTime) {
+    const SOURCE_TIME_ZONE = 'Europe/Berlin';
+
     const dateParts = matchDate.split(', ');
     const monthDay = dateParts[1];
     const year = dateParts[2];
@@ -25,9 +27,11 @@ function parseMatchDateTimeToUtc(matchDate, matchTime) {
     const monthIndex = new Date(Date.parse(monthDay.split(' ')[0] + " 1, 2012")).getMonth();
     const day = parseInt(monthDay.split(' ')[1], 10);
 
-    const localDateTimeString = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour24).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
+    const naiveDateTimeString = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour24).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
 
-    return fromZonedTime(localDateTimeString, POLAND_TIME_ZONE);
+    const utcDate = fromZonedTime(naiveDateTimeString, SOURCE_TIME_ZONE);
+
+    return utcDate;
 }
 
 function getSessionTimeRange(sinceTimestampMs, resetTimeParam) {
