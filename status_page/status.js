@@ -10,7 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
         serviceStatus: document.getElementById('service-status'),
         mainService: document.getElementById('main-service'),
         lastUpdated: document.getElementById('last-updated'),
-        timelineGrid: document.getElementById('timeline-grid')
+        timelineGrid: document.getElementById('timeline-grid'),
+        timelinePeriod: document.getElementById('timeline-period')
     };
 
     const STATUS_CONFIG = {
