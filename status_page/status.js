@@ -1,7 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Endpoint jest teraz serwowany przez ten sam serwer, więc używamy ścieżki względnej.
-    const API_URL = '/health'; 
-    const CHECK_INTERVAL = 5 * 60 * 1000; // 5 minut
+    // Od teraz używamy tylko jednego, głównego endpointu API
+    const API_URL = '/api/status';
+    const CHECK_INTERVAL = 5 * 60 * 1000;
+    const DAYS_TO_SHOW_TIMELINE = 90;
 
     const elements = {
         mainStatusText: document.getElementById('main-status-text'),
@@ -14,14 +15,13 @@ document.addEventListener('DOMContentLoaded', () => {
         incidentLog: document.getElementById('incident-log')
     };
 
-    // Konfiguracja statusów pozostaje bez zmian
     const STATUS_CONFIG = {
         operational: { text: "Wszystkie systemy działają", description: "Wszystkie usługi działają bez zakłóceń.", serviceText: "Operacyjny", class: "operational" },
-        degraded: { text: "Zdegradowana wydajność", description: "Niektóre usługi mogą działać wolniej lub być niedostępne.", serviceText: "Zdegradowany", class: "degraded" },
+        degraded: { text: "Zdegradowana wydajność", description: "Niektóre usługi mogą działać wolniej.", serviceText: "Zdegradowany", class: "degraded" },
         error: { text: "Poważna awaria", description: "Wystąpiły krytyczne problemy z dostępnością usług.", serviceText: "Awaria", class: "error" },
-        maintenance: { text: "Planowana konserwacja", description: "Prowadzimy prace konserwacyjne w celu ulepszenia usług.", serviceText: "Konserwacja", class: "maintenance" }
+        maintenance: { text: "Planowana konserwacja", description: "Prowadzimy prace konserwacyjne.", serviceText: "Konserwacja", class: "maintenance" }
     };
-    
+
     const formatDate = (dateString) => new Date(dateString).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
 
     function updateOverallStatusUI(status) {
@@ -31,103 +31,81 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.statusIcon.className = `status-icon ${config.class}`;
     }
 
-    /**
-     * Nowa funkcja do renderowania usług na podstawie odpowiedzi z /health
-     */
-    function renderServices(checks) {
-        if (!elements.servicesList) return;
-
-        const serviceMapping = {
-            henrik_api: { name: 'Zewnętrzne API (Henrik)', description: 'Kluczowe API dostarczające dane o grze.' },
-            stats_file: { name: 'Plik ze statystykami', description: 'Wygenerowany plik HTML ze statystykami graczy.' },
-            docs_file: { name: 'Plik dokumentacji', description: 'Dokumentacja API wygenerowana automatycznie.' }
-        };
-
-        elements.servicesList.innerHTML = Object.entries(checks).map(([key, check]) => {
-            const serviceInfo = serviceMapping[key] || { name: key, description: 'Monitorowany komponent systemowy.' };
-            
-            // Mapowanie statusu z backendu na status w frontendzie
-            let currentStatus = 'operational';
-            if (check.status === 'missing' || check.status === 'unreachable') {
-                currentStatus = 'error';
-            } else if (check.status === 'degraded') {
-                currentStatus = 'degraded';
-            }
-
-            const config = STATUS_CONFIG[currentStatus];
-
+    function renderServices(services = {}) {
+        elements.servicesList.innerHTML = Object.values(services).map(service => {
+            const config = STATUS_CONFIG[service.status] || STATUS_CONFIG.error;
             return `
                 <div class="service-item ${config.class}">
                     <div class="service-header">
-                        <div class="service-name">${serviceInfo.name}</div>
+                        <div class="service-name">${service.name}</div>
                         <span class="service-status ${config.class}">${config.serviceText}</span>
                     </div>
-                    <div class="service-description">${serviceInfo.description}</div>
-                </div>
-            `;
+                    <div class="service-description">${service.description}</div>
+                </div>`;
+        }).join('') || '<p>Brak skonfigurowanych usług do monitorowania.</p>';
+    }
+
+    function renderIncidents(incidents = []) {
+        if (!elements.incidentLog || incidents.length === 0) {
+            elements.incidentLog.innerHTML = '<p>Brak incydentów w ostatnim czasie.</p>';
+            return;
+        }
+        elements.incidentLog.innerHTML = incidents.map(incident => {
+            const config = STATUS_CONFIG[incident.status] || STATUS_CONFIG.degraded;
+            return `
+                 <div class="incident-card ${config.class}">
+                    <div class="incident-date">${formatDate(incident.date)}</div>
+                    <div class="incident-message">${incident.message}</div>
+                </div>`;
         }).join('');
     }
 
-    /**
-     * UWAGA: Sekcje incydentów i historii na razie są statyczne.
-     * Poniżej znajduje się wyjaśnienie, jak je zaimplementować.
-     */
-    function renderStaticIncidents() {
-        if (!elements.incidentLog) return;
-        elements.incidentLog.innerHTML = `
-             <div class="incident-card maintenance">
-                <div class="incident-date">${formatDate(new Date().toISOString())}</div>
-                <div class="incident-message">System monitorowania został zintegrowany z backendem aplikacji. Historia incydentów zostanie wkrótce zaimplementowana.</div>
-            </div>
-        `;
+    function renderTimeline(history = {}) {
+        elements.timelineGrid.innerHTML = '';
+        const today = new Date();
+        for (let i = DAYS_TO_SHOW_TIMELINE - 1; i >= 0; i--) {
+            const date = new Date(today);
+            date.setDate(today.getDate() - i);
+            const dateString = date.toISOString().split('T')[0];
+            const status = history[dateString] || 'no-data';
+            const statusText = STATUS_CONFIG[status]?.serviceText || 'Brak danych';
+            elements.timelineGrid.innerHTML += `
+                <div class="timeline-bar ${status}">
+                    <div class="tooltip"><strong>${formatDate(dateString)}</strong><br>Status: ${statusText}</div>
+                </div>`;
+        }
     }
-
-    function renderTimelinePlaceholder() {
-         if (!elements.timelineGrid) return;
-         elements.timelineGrid.innerHTML = `<p style="text-align:center; width: 100%; color: var(--text-muted);">Funkcjonalność historii dostępności jest w trakcie implementacji.</p>`;
-    }
-
 
     async function checkStatus() {
+        elements.lastUpdated.classList.add('loading');
+        elements.lastUpdated.textContent = 'Aktualizowanie...';
         try {
-            elements.lastUpdated.classList.add('loading');
-            elements.lastUpdated.textContent = 'Aktualizowanie...';
-            
+            // Jedno zapytanie, które pobiera wszystkie potrzebne dane
             const response = await fetch(API_URL);
             if (!response.ok) {
-                // Nawet jeśli odpowiedź to 503, nadal jest to JSON, który możemy przetworzyć
-                if (response.headers.get("content-type")?.includes("application/json")) {
-                     const errorData = await response.json();
-                     throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-                } else {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                throw new Error(`Błąd API: ${response.statusText}`);
             }
-            
             const data = await response.json();
-            
-            updateOverallStatusUI(data.status);
-            renderServices(data.checks);
 
-            // Na razie renderujemy statyczne dane dla incydentów i historii
-            renderStaticIncidents();
-            renderTimelinePlaceholder();
-            
+            // Renderujemy wszystkie komponenty na podstawie jednej odpowiedzi
+            updateOverallStatusUI(data.overallStatus);
+            renderServices(data.services);
+            renderIncidents(data.incidents);
+            renderTimeline(data.history);
+
         } catch (error) {
-            console.error('Status check failed:', error);
+            console.error('Błąd podczas sprawdzania statusu:', error);
             updateOverallStatusUI('error');
-            elements.servicesList.innerHTML = `<div class="service-item error"><div class="service-name">Błąd połączenia</div><div class="service-description">Nie udało się pobrać statusu z serwera. Sprawdź konsolę, aby uzyskać więcej informacji.</div></div>`;
-            renderStaticIncidents();
-            renderTimelinePlaceholder();
-
+            elements.servicesList.innerHTML = `<div class="service-item error"><div class="service-name">Błąd połączenia z API</div></div>`;
+            elements.incidentLog.innerHTML = `<p>Nie można załadować historii incydentów.</p>`;
+            elements.timelineGrid.innerHTML = `<p>Nie można załadować osi czasu.</p>`;
         } finally {
             const now = new Date();
-            elements.lastUpdated.textContent = `Ostatnia aktualizacja: ${now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+            elements.lastUpdated.textContent = `Ostatnia aktualizacja: ${now.toLocaleTimeString('pl-PL')}`;
             elements.lastUpdated.classList.remove('loading');
         }
     }
 
-    // Pierwsze wywołanie i ustawienie interwału
     checkStatus();
     setInterval(checkStatus, CHECK_INTERVAL);
 });

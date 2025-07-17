@@ -1,9 +1,10 @@
 const express = require('express');
-const path = require('path');
+const path =require('path');
 const fs = require('fs').promises;
 const { checkApiStatus } = require('../services/api');
 const log = require('../utils/logger');
 const config = require('../config');
+const { logToDiscord } = require('../utils/discord');
 
 const router = express.Router();
 const STATUS_DATA_PATH = path.join(process.cwd(), 'status-data.json');
@@ -145,6 +146,53 @@ router.get('/status', (req, res) => {
         res.sendFile(statusFilePath);
     } else {
         res.status(404).send('Plik strony statusu nie został znaleziony.');
+    }
+});
+
+router.get('/api/status', async (req, res) => {
+    try {
+        const apiStatus = await checkApiStatus();
+        const statsFileExists = require('fs').existsSync(path.join(process.cwd(), 'valorant_stats.html'));
+
+        const automatedChecks = {
+            henrik_api: {
+                name: 'Zewnętrzne API (Henrik)',
+                description: 'Kluczowe API dostarczające dane o grze.',
+                status: apiStatus.reachable ? 'operational' : 'error'
+            },
+            stats_file: {
+                name: 'Generator Statystyk',
+                description: 'Proces generowania plików ze statystykami.',
+                status: statsFileExists ? 'operational' : 'degraded'
+            }
+        };
+
+        const statusDataRaw = await fs.readFile(STATUS_DATA_PATH, 'utf-8');
+        const incidentData = JSON.parse(statusDataRaw);
+
+        const statusPriority = { operational: 1, maintenance: 2, degraded: 3, error: 4 };
+        
+        let finalStatus = 'operational';
+        for (const key in automatedChecks) {
+            if (statusPriority[automatedChecks[key].status] > statusPriority[finalStatus]) {
+                finalStatus = automatedChecks[key].status;
+            }
+        }
+        const latestIncident = incidentData.incidents[0];
+        if (latestIncident && statusPriority[latestIncident.status] > statusPriority[finalStatus]) {
+            finalStatus = latestIncident.status;
+        }
+
+        res.json({
+            overallStatus: finalStatus,
+            services: automatedChecks,
+            incidents: incidentData.incidents,
+            history: incidentData.history
+        });
+
+    } catch (error) {
+        log.error('API_STATUS', 'Krytyczny błąd podczas pobierania danych statusu', error);
+        res.status(500).json({ error: 'Nie udało się pobrać danych statusu.' });
     }
 });
 
