@@ -293,7 +293,7 @@ router.get('/dailymatches/:event', asyncHandler(async (req, res, next) => {
         const teamB = TEAMS[match.teams[1]?.name] || 'TBD';
         console.log(match.teams[0]?.name, TEAMS[match.teams[0]?.name])
         console.log(match.teams[1]?.name, TEAMS[match.teams[1]?.name])
-        return `${teamA} vs ${teamB} (${time})`;
+        return `${time} ${teamA} vs ${teamB}`;
     });
 
     const result = `Dzisiejsze mecze: ${matchesStrings.join(' | ')}`;
