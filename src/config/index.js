@@ -20,7 +20,9 @@ const config = {
         if (!this.HENRIKDEV_API_KEY) {
             throw new Error("You need to setup your HenrikDev API key!");
         }
-    }
+    },
+
+    API_SECRET_KEY: process.env.API_SECRET_KEY || 'domyslny-sekretny-klucz-zmien-to'
 };
 
 module.exports = config;

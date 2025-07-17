@@ -1,189 +1,133 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const API_URL = '/health';
-    const DAYS_TO_SHOW = 90;
-    const CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
+    // Endpoint jest teraz serwowany przez ten sam serwer, więc używamy ścieżki względnej.
+    const API_URL = '/health'; 
+    const CHECK_INTERVAL = 5 * 60 * 1000; // 5 minut
 
     const elements = {
         mainStatusText: document.getElementById('main-status-text'),
         statusDescription: document.getElementById('status-description'),
         statusIcon: document.getElementById('status-icon'),
-        serviceStatus: document.getElementById('service-status'),
-        mainService: document.getElementById('main-service'),
         lastUpdated: document.getElementById('last-updated'),
+        servicesList: document.getElementById('services-list'),
         timelineGrid: document.getElementById('timeline-grid'),
-        timelinePeriod: document.getElementById('timeline-period')
+        timelinePeriod: document.getElementById('timeline-period'),
+        incidentLog: document.getElementById('incident-log')
     };
 
+    // Konfiguracja statusów pozostaje bez zmian
     const STATUS_CONFIG = {
-        operational: {
-            text: "Wszystkie systemy działają",
-            description: "Wszystkie usługi działają bez zakłóceń",
-            serviceText: "Operacyjny",
-            class: "operational"
-        },
-        degraded: {
-            text: "Zdegradowana wydajność",
-            description: "Niektóre usługi mogą działać wolniej",
-            serviceText: "Zdegradowany",
-            class: "degraded"
-        },
-        error: {
-            text: "Wykryto problemy",
-            description: "Wystąpiły problemy z dostępnością usług",
-            serviceText: "Awaria",
-            class: "error"
-        },
-        maintenance: {
-            text: "Planowana konserwacja",
-            description: "Trwają prace konserwacyjne",
-            serviceText: "Konserwacja",
-            class: "maintenance"
-        }
+        operational: { text: "Wszystkie systemy działają", description: "Wszystkie usługi działają bez zakłóceń.", serviceText: "Operacyjny", class: "operational" },
+        degraded: { text: "Zdegradowana wydajność", description: "Niektóre usługi mogą działać wolniej lub być niedostępne.", serviceText: "Zdegradowany", class: "degraded" },
+        error: { text: "Poważna awaria", description: "Wystąpiły krytyczne problemy z dostępnością usług.", serviceText: "Awaria", class: "error" },
+        maintenance: { text: "Planowana konserwacja", description: "Prowadzimy prace konserwacyjne w celu ulepszenia usług.", serviceText: "Konserwacja", class: "maintenance" }
     };
+    
+    const formatDate = (dateString) => new Date(dateString).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    function getTodayString() {
-        return new Date().toISOString().split('T')[0];
-    }
-
-    function formatDate(dateString) {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('pl-PL', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric'
-        });
-    }
-
-    function getHistory() {
-        try {
-            const history = JSON.parse(localStorage.getItem('apiStatusHistory') || '{}');
-            return history;
-        } catch (e) {
-            console.error("Failed to parse history:", e);
-            return {};
-        }
-    }
-
-    function saveHistory(history) {
-        const sortedKeys = Object.keys(history).sort().reverse();
-        const cleanedHistory = {};
-        
-        for (let i = 0; i < Math.min(sortedKeys.length, DAYS_TO_SHOW); i++) {
-            cleanedHistory[sortedKeys[i]] = history[sortedKeys[i]];
-        }
-        
-        localStorage.setItem('apiStatusHistory', JSON.stringify(cleanedHistory));
-    }
-
-    function updateUI(status) {
+    function updateOverallStatusUI(status) {
         const config = STATUS_CONFIG[status] || STATUS_CONFIG.error;
-        
         elements.mainStatusText.textContent = config.text;
         elements.statusDescription.textContent = config.description;
         elements.statusIcon.className = `status-icon ${config.class}`;
-        elements.serviceStatus.textContent = config.serviceText;
-        elements.serviceStatus.className = `service-status ${config.class}`;
-        elements.mainService.className = `service-item ${config.class}`;
     }
 
-    function renderTimeline() {
-        const history = getHistory();
-        const historyKeys = Object.keys(history).sort();
-        elements.timelineGrid.innerHTML = '';
+    /**
+     * Nowa funkcja do renderowania usług na podstawie odpowiedzi z /health
+     */
+    function renderServices(checks) {
+        if (!elements.servicesList) return;
 
-        // Update timeline period text
-        if (historyKeys.length === 0) {
-            elements.timelinePeriod.textContent = 'Brak danych';
+        const serviceMapping = {
+            henrik_api: { name: 'Zewnętrzne API (Henrik)', description: 'Kluczowe API dostarczające dane o grze.' },
+            stats_file: { name: 'Plik ze statystykami', description: 'Wygenerowany plik HTML ze statystykami graczy.' },
+            docs_file: { name: 'Plik dokumentacji', description: 'Dokumentacja API wygenerowana automatycznie.' }
+        };
+
+        elements.servicesList.innerHTML = Object.entries(checks).map(([key, check]) => {
+            const serviceInfo = serviceMapping[key] || { name: key, description: 'Monitorowany komponent systemowy.' };
             
-            // Show today as a starting point
-            const today = new Date();
-            const todayString = today.toISOString().split('T')[0];
-            
-            const bar = document.createElement('div');
-            bar.className = 'timeline-bar no-data';
-            
-            const tooltip = document.createElement('div');
-            tooltip.className = 'tooltip';
-            tooltip.innerHTML = `
-                <strong>${formatDate(todayString)}</strong><br>
-                Status: Brak danych
+            // Mapowanie statusu z backendu na status w frontendzie
+            let currentStatus = 'operational';
+            if (check.status === 'missing' || check.status === 'unreachable') {
+                currentStatus = 'error';
+            } else if (check.status === 'degraded') {
+                currentStatus = 'degraded';
+            }
+
+            const config = STATUS_CONFIG[currentStatus];
+
+            return `
+                <div class="service-item ${config.class}">
+                    <div class="service-header">
+                        <div class="service-name">${serviceInfo.name}</div>
+                        <span class="service-status ${config.class}">${config.serviceText}</span>
+                    </div>
+                    <div class="service-description">${serviceInfo.description}</div>
+                </div>
             `;
-            
-            bar.appendChild(tooltip);
-            elements.timelineGrid.appendChild(bar);
-            return;
-        }
-
-        // Update period text with actual date range
-        const firstDate = formatDate(historyKeys[0]);
-        const lastDate = formatDate(historyKeys[historyKeys.length - 1]);
-        const dayCount = historyKeys.length;
-        
-        if (dayCount === 1) {
-            elements.timelinePeriod.textContent = `1 dzień (${firstDate})`;
-        } else {
-            elements.timelinePeriod.textContent = `${dayCount} dni (${firstDate} - ${lastDate})`;
-        }
-
-        // Show only days with actual data
-        historyKeys.forEach(dateString => {
-            const status = history[dateString];
-            
-            const bar = document.createElement('div');
-            bar.className = `timeline-bar ${status}`;
-            
-            const tooltip = document.createElement('div');
-            tooltip.className = 'tooltip';
-            tooltip.innerHTML = `
-                <strong>${formatDate(dateString)}</strong><br>
-                Status: ${STATUS_CONFIG[status]?.serviceText || 'Nieznany'}
-            `;
-            
-            bar.appendChild(tooltip);
-            elements.timelineGrid.appendChild(bar);
-        });
+        }).join('');
     }
+
+    /**
+     * UWAGA: Sekcje incydentów i historii na razie są statyczne.
+     * Poniżej znajduje się wyjaśnienie, jak je zaimplementować.
+     */
+    function renderStaticIncidents() {
+        if (!elements.incidentLog) return;
+        elements.incidentLog.innerHTML = `
+             <div class="incident-card maintenance">
+                <div class="incident-date">${formatDate(new Date().toISOString())}</div>
+                <div class="incident-message">System monitorowania został zintegrowany z backendem aplikacji. Historia incydentów zostanie wkrótce zaimplementowana.</div>
+            </div>
+        `;
+    }
+
+    function renderTimelinePlaceholder() {
+         if (!elements.timelineGrid) return;
+         elements.timelineGrid.innerHTML = `<p style="text-align:center; width: 100%; color: var(--text-muted);">Funkcjonalność historii dostępności jest w trakcie implementacji.</p>`;
+    }
+
 
     async function checkStatus() {
         try {
-            elements.lastUpdated.textContent = 'Sprawdzanie...';
+            elements.lastUpdated.classList.add('loading');
+            elements.lastUpdated.textContent = 'Aktualizowanie...';
             
             const response = await fetch(API_URL);
-            const data = await response.json();
-            
-            const status = data.status || 'error';
-            updateUI(status);
-            
-            const history = getHistory();
-            const today = getTodayString();
-            
-            // Save worst status of the day
-            const currentStatus = history[today];
-            const statusPriority = { operational: 1, degraded: 2, maintenance: 3, error: 4 };
-                    
-            if (!currentStatus || (statusPriority[status] || 4) > (statusPriority[currentStatus] || 0)) {
-                history[today] = status;
-                saveHistory(history);
+            if (!response.ok) {
+                // Nawet jeśli odpowiedź to 503, nadal jest to JSON, który możemy przetworzyć
+                if (response.headers.get("content-type")?.includes("application/json")) {
+                     const errorData = await response.json();
+                     throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                } else {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
             }
             
-            renderTimeline();
+            const data = await response.json();
+            
+            updateOverallStatusUI(data.status);
+            renderServices(data.checks);
+
+            // Na razie renderujemy statyczne dane dla incydentów i historii
+            renderStaticIncidents();
+            renderTimelinePlaceholder();
             
         } catch (error) {
             console.error('Status check failed:', error);
-            updateUI('error');
-            
-            const history = getHistory();
-            history[getTodayString()] = 'error';
-            saveHistory(history);
-            renderTimeline();
+            updateOverallStatusUI('error');
+            elements.servicesList.innerHTML = `<div class="service-item error"><div class="service-name">Błąd połączenia</div><div class="service-description">Nie udało się pobrać statusu z serwera. Sprawdź konsolę, aby uzyskać więcej informacji.</div></div>`;
+            renderStaticIncidents();
+            renderTimelinePlaceholder();
+
         } finally {
             const now = new Date();
-            elements.lastUpdated.textContent = `Ostatnia aktualizacja: ${now.toLocaleString('pl-PL')}`;
+            elements.lastUpdated.textContent = `Ostatnia aktualizacja: ${now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+            elements.lastUpdated.classList.remove('loading');
         }
     }
 
-    // Initialize
-    renderTimeline();
+    // Pierwsze wywołanie i ustawienie interwału
     checkStatus();
     setInterval(checkStatus, CHECK_INTERVAL);
 });

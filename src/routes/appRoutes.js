@@ -1,19 +1,58 @@
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
-const { logToDiscord } = require('../utils/discord');
+const fs = require('fs').promises;
+const { checkApiStatus } = require('../services/api');
 const log = require('../utils/logger');
-const { checkApiStatus } = require('../services/api'); // <-- Dodany import
+const config = require('../config');
 
 const router = express.Router();
+const STATUS_DATA_PATH = path.join(process.cwd(), 'status-data.json');
+
+router.get('/api/status/data', async (req, res) => {
+    try {
+        const statusDataRaw = await fs.readFile(STATUS_DATA_PATH, 'utf-8');
+        const statusData = JSON.parse(statusDataRaw);
+        res.json(statusData);
+    } catch (error) {
+        log.error('API_STATUS', 'Nie można odczytać pliku status-data.json', error);
+        res.status(500).json({ error: 'Błąd po stronie serwera.' });
+    }
+});
+
+router.post('/api/status/incidents', async (req, res) => {
+    const authHeader = req.headers['authorization'];
+    if (authHeader !== config.API_SECRET_KEY) {
+        return res.status(401).json({ error: 'Brak autoryzacji' });
+    }
+
+    const { message, status } = req.body;
+    if (!message || !status || !['operational', 'degraded', 'error', 'maintenance'].includes(status)) {
+        return res.status(400).json({ error: 'Nieprawidłowe dane. Wymagane: message, status.' });
+    }
+
+    try {
+        const statusDataRaw = await fs.readFile(STATUS_DATA_PATH, 'utf-8');
+        const data = JSON.parse(statusDataRaw);
+        const today = new Date().toISOString().split('T')[0];
+
+        data.incidents.unshift({ date: today, message, status });
+
+        data.history[today] = status;
+
+        await fs.writeFile(STATUS_DATA_PATH, JSON.stringify(data, null, 2));
+
+        log.info('API_STATUS', `Dodano nowy incydent przez bota: [${status}]`);
+        res.status(201).json({ success: true, message: 'Incydent dodany pomyślnie.' });
+
+    } catch (error) {
+        log.error('API_STATUS', 'Nie można zapisać nowego incydentu', error);
+        res.status(500).json({ error: 'Błąd zapisu po stronie serwera.' });
+    }
+});
 
 router.get('/', (req, res) => {
     const docsFilePath = path.join(process.cwd(), 'docs.html');
-    if (fs.existsSync(docsFilePath)) {
-        res.sendFile(docsFilePath);
-    } else {
-        res.status(404).send('Plik dokumentacji nie został znaleziony. Uruchom `npm run docs`, aby go wygenerować.');
-    }
+    res.sendFile(docsFilePath);
 });
 
 router.get('/statystyki', (req, res) => {

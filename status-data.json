@@ -1,0 +1,18 @@
+{
+  "incidents": [
+    {
+      "date": "2025-07-17",
+      "message": "System monitorowania został zintegrowany z backendem i botem Discord.",
+      "status": "maintenance"
+    },
+    {
+      "date": "2025-07-15",
+      "message": "Inicjalna konfiguracja strony statusu została zakończona.",
+      "status": "operational"
+    }
+  ],
+  "history": {
+    "2025-07-16": "maintenance",
+    "2025-07-15": "operational"
+  }
+}
