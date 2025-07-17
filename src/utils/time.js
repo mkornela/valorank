@@ -58,7 +58,138 @@ function getSessionTimeRange(sinceTimestampMs, resetTimeParam) {
     return { startTime, endTime: now };
 }
 
+function formatMatchDateTime(matchDate, matchTime) {
+    const dateParts = matchDate.split(', ');
+    const monthDay = dateParts[1];
+    const year = dateParts[2];
+    
+    const timeParts = matchTime.split(' ');
+    const time = timeParts[0];
+    const period = timeParts[1];
+    
+    const [hours, minutes] = time.split(':');
+    let hour24 = parseInt(hours, 10);
+    
+    if (period === 'PM' && hour24 !== 12) {
+        hour24 += 12;
+    } else if (period === 'AM' && hour24 === 12) {
+        hour24 = 0;
+    }
+    
+    const fullDateTime = new Date(`${monthDay}, ${year} ${hour24}:${minutes}:00`);
+    
+    const polishFormatter = new Intl.DateTimeFormat('pl-PL', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Europe/Warsaw'
+    });
+    
+    return polishFormatter.format(fullDateTime);
+}
+
+function formatMatchDateTimeShort(matchDate, matchTime) {
+    const dateParts = matchDate.split(', ');
+    const monthDay = dateParts[1];
+    const year = dateParts[2];
+    
+    const timeParts = matchTime.split(' ');
+    const time = timeParts[0];
+    const period = timeParts[1];
+    
+    const [hours, minutes] = time.split(':');
+    let hour24 = parseInt(hours, 10);
+    
+    if (period === 'PM' && hour24 !== 12) {
+        hour24 += 12;
+    } else if (period === 'AM' && hour24 === 12) {
+        hour24 = 0;
+    }
+    
+    const fullDateTime = new Date(`${monthDay}, ${year} ${hour24}:${minutes}:00`);
+    
+    const polishFormatter = new Intl.DateTimeFormat('pl-PL', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Europe/Warsaw'
+    });
+    
+    return polishFormatter.format(fullDateTime);
+}
+
+function getTimeUntilMatch(matchDate, matchTime) {
+    const dateParts = matchDate.split(', ');
+    const monthDay = dateParts[1];
+    const year = dateParts[2];
+    
+    const timeParts = matchTime.split(' ');
+    const time = timeParts[0];
+    const period = timeParts[1];
+    
+    const [hours, minutes] = time.split(':');
+    let hour24 = parseInt(hours, 10);
+    
+    if (period === 'PM' && hour24 !== 12) {
+        hour24 += 12;
+    } else if (period === 'AM' && hour24 === 12) {
+        hour24 = 0;
+    }
+    
+    const matchDateTime = new Date(`${monthDay}, ${year} ${hour24}:${minutes}:00`);
+    const now = new Date();
+    
+    const diffMs = matchDateTime.getTime() - now.getTime();
+    
+    if (diffMs < 0) {
+        return "Mecz aktualnie trwa!";
+    }
+    
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    const remainingHours = diffHours % 24;
+    const remainingMinutes = diffMinutes % 60;
+    
+    if (diffDays > 0) {
+        if (remainingHours > 0) {
+            const dayText = diffDays === 1 ? "dzień" : "dni";
+            const hourText = remainingHours === 1 ? "godzina" : 
+                           remainingHours < 5 ? "godziny" : "godzin";
+            return `${diffDays} ${dayText}, ${remainingHours} ${hourText}`;
+        } else {
+            const dayText = diffDays === 1 ? "dzień" : "dni";
+            return `${diffDays} ${dayText}`;
+        }
+    } else if (diffHours > 0) {
+        if (remainingMinutes > 0) {
+            const hourText = diffHours === 1 ? "godzina" : 
+                           diffHours < 5 ? "godziny" : "godzin";
+            const minuteText = remainingMinutes === 1 ? "minuta" : 
+                             remainingMinutes < 5 ? "minuty" : "minut";
+            return `${diffHours} ${hourText}, ${remainingMinutes} ${minuteText}`;
+        } else {
+            const hourText = diffHours === 1 ? "godzina" : 
+                           diffHours < 5 ? "godziny" : "godzin";
+            return `${diffHours} ${hourText}`;
+        }
+    } else {
+        const minuteText = diffMinutes === 1 ? "minuta" : 
+                         diffMinutes < 5 ? "minuty" : "minut";
+        return `${diffMinutes} ${minuteText}`;
+    }
+}
+
 module.exports = {
     getPolandTimezoneOffset,
-    getSessionTimeRange
+    getSessionTimeRange,
+    formatMatchDateTime,
+    formatMatchDateTimeShort,
+    getTimeUntilMatch
 };

@@ -2,11 +2,14 @@ const express = require('express');
 const router = express.Router();
 const { VALID_REGIONS, RANK_TIERS } = require('../constants');
 const { logToDiscord } = require('../utils/discord');
-const { getSessionTimeRange } = require('../utils/time');
+const { getSessionTimeRange, formatMatchDateTimeShort, getTimeUntilMatch } = require('../utils/time');
 const { fetchAccountDetails, fetchMatchHistory, fetchPlayerMMR, fetchLeaderboard, fetchMMRHistory, fetchMMRHistoryDaily } = require('../services/api');
 const { findPlayerByRank } = require('../data/leaderboard');
 const { calculateRRToGoal, calculateSessionStats } = require('../services/game');
 const log = require('../utils/logger');
+
+const { VlrClient } = require('vlr-client');
+const vlr = new VlrClient();
 
 const asyncHandler = fn => (req, res, next) => {
     return Promise
@@ -213,6 +216,28 @@ router.get('/getrank/:position', asyncHandler(async (req, res, next) => {
     
     res.type('text/plain').send(result);
     logToDiscord({ title: 'API Call Success: `/getrank`', color: 0x00FF00, fields: [{ name: 'Position', value: `\`${rankPosition}\``, inline: true }, { name: 'Result', value: `\`${result}\``, inline: false }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
+}));
+
+router.get('/nextmatch/:event', asyncHandler(async (req, res, next) => {
+    const { event } = req.params;
+    let result;
+
+    const matches = await vlr.getUpcomingMatches(); let games = [];
+    matches.data.forEach(match => {
+        if(match.event.name == event) //VCT 2025: EMEA Stage 2 as an example
+            games.push({
+                id: match.id,
+                date: match.date,
+                time: match.time,
+                team1: match.teams[0].name,
+                team2: match.teams[1].name
+            })
+    })
+
+    let date = formatMatchDateTimeShort(games[0].date, games[0].time)
+    result = `Następny mecz na "${event}" to: ${games[0].team1} vs ${games[0].team2} za ${getTimeUntilMatch(games[0].date, games[0].time)} (${date})`
+    res.type('text/plain').send(result);
+    logToDiscord({ title: 'API Call Success: `/nextmatch`', color: 0x00FF00, fields: [{ name: 'Event', value: `\`${event}\``, inline: true }, { name: 'Result', value: `\`${result}\``, inline: false }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
 }));
 
 module.exports = router;
