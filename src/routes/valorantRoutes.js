@@ -294,7 +294,7 @@ router.get('/dailymatches/:event', asyncHandler(async (req, res, next) => {
         return `${time} ${teamA} vs ${teamB}`;
     });
 
-    const result = `Dzisiejsze mecze: ${matchesStrings.join(' | ')}`;
+    const result = `Dzisiejsze mecze ${EVENTS[event]}: ${matchesStrings.join(' | ')}`;
 
     res.type('text/plain').send(result);
     logToDiscord({
