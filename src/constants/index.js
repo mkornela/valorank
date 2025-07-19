@@ -32,7 +32,8 @@ const TEAMS = {
 }
 
 const EVENTS = {
-    'VCT 2025: EMEA Stage 2': 'VCT EMEA Stage 2'
+    'VCT 2025: EMEA Stage 2': 'VCT EMEA Stage 2',
+    'VCT 2025: Americas Stage 2': 'VCT Americas Stage 2'
 }
 
 module.exports = {
