@@ -269,8 +269,8 @@ router.get('/dailymatches/:event', asyncHandler(async (req, res, next) => {
     });
 
     if (dailyMatches.length === 0) {
-        const result = `Nie znaleziono na dzisiaj żadnych meczy dla wydarzenia: "${event}".`;
-        res.status(404).type('text/plain').send(result);
+        const result = `Nie znaleziono na dzisiaj żadnych meczy dla wydarzenia: "${EVENTS[event]}".`;
+        res.status(200).type('text/plain').send(result);
         logToDiscord({
             title: 'API Call Info: `/dailymatches` - Not Found',
             color: 0xFFA500,
