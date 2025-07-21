@@ -1,6 +1,11 @@
 {
   "incidents": [
     {
+      "date": "2025-07-21",
+      "message": "Leaderboard poszerzony do obsługiwania 15000 graczy.",
+      "status": "maintenance"
+    },
+    {
       "date": "2025-07-17",
       "message": "System monitorowania został zintegrowany z backendem i botem Discord.",
       "status": "maintenance"
@@ -12,6 +17,11 @@
     }
   ],
   "history": {
+    "2025-07-21": "maintenance",
+    "2025-07-20": "operational",
+    "2025-07-19": "operational",
+    "2025-07-18": "operational",
+    "2025-07-17": "operational",
     "2025-07-16": "maintenance",
     "2025-07-15": "operational"
   }
