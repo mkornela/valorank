@@ -2,11 +2,11 @@ const OUTPUT_FILE = 'leaderboard.json';
 const fs = require('fs');
 const https = require('https');
 
-const API_KEY = 'RGAPI-782179cd-703d-458a-bbdd-a5708aa86d8c';
+const API_KEY = '';
 const ACT_ID = 'aef237a0-494d-3a14-a1c8-ec8de84e309c';
 const BASE_URL = 'eu.api.riotgames.com';
 const SIZE_PER_REQUEST = 200;
-const TARGET_PLAYERS = 10000;
+const TARGET_PLAYERS = 15000;
 
 const SAFE_REQUESTS_PER_SECOND = 2;
 const SAFE_REQUESTS_PER_2_MINUTES = 55;
