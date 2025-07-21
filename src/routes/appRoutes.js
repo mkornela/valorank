@@ -195,5 +195,20 @@ router.get('/api/status', async (req, res) => {
     }
 });
 
+//REQUIRED BY RIOT FOR ME TO OBTAIN THEIR API KEY
+//REQUIRED BY RIOT FOR ME TO OBTAIN THEIR API KEY
+//REQUIRED BY RIOT FOR ME TO OBTAIN THEIR API KEY
+router.get('/riot.txt', (req, res) => {
+    const riotFilePath = path.join(process.cwd(), 'riot.txt');
+    
+    if (fs.existsSync(riotFilePath)) {
+        res.setHeader('Content-Type', 'text/plain');
+        res.sendFile(riotFilePath);
+        log.info('RIOT_VERIFICATION', `Riot verification file accessed from ${req.ip}`);
+    } else {
+        log.error('RIOT_VERIFICATION', 'Riot.txt file not found');
+        res.status(404).send('Riot verification file not found');
+    }
+});
 
 module.exports = router;
