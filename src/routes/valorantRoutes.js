@@ -197,8 +197,8 @@ router.get('/getrank/:position', asyncHandler(async (req, res, next) => {
     if (isNaN(rankPosition) || rankPosition <= 0) {
         return res.status(400).type('text/plain').send('Błąd: Podano nieprawidłową pozycję.');
     }
-    if (rankPosition > 10000) {
-        return res.type('text/plain').send(`Aktualnie !getrank obsługuje tylko top 10000!`);
+    if (rankPosition > 15000) {
+        return res.type('text/plain').send(`Leaderboard VALORANT obsługuje tylko top 15000!`);
     }
 
     const player = findPlayerByRank(rankPosition);
