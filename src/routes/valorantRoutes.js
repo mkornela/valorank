@@ -79,10 +79,39 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     const { currenttier, ranking_in_tier } = mmr.data.current_data;
     const { rr, goal } = calculateRRToGoal(currenttier, ranking_in_tier || 0, leaderboard.data?.players);
     
-    const finalText = text.replace(/{name}/g, name).replace(/{tag}/g, tag).replace(/{rank}/g, RANK_TIERS[currenttier] || "Unknown").replace(/{rr}/g, (ranking_in_tier || 0).toString()).replace(/{rrToGoal}/g, rr.toString()).replace(/{goal}/g, goal);
+    const isRadiant = currenttier === 27;
+    
+    let finalText;
+    if (isRadiant && rr === 0) {
+        finalText = text
+            .replace(/{name}/g, name)
+            .replace(/{tag}/g, tag)
+            .replace(/{rank}/g, RANK_TIERS[currenttier] || "Unknown")
+            .replace(/{rr}/g, (ranking_in_tier || 0).toString())
+            .replace(/{rrToGoal} RR do {goal}/g, "Gratulacje Radianta!")
+            .replace(/{rrToGoal}/g, "0")
+            .replace(/{goal}/g, "MAX");
+    } else {
+        finalText = text
+            .replace(/{name}/g, name)
+            .replace(/{tag}/g, tag)
+            .replace(/{rank}/g, RANK_TIERS[currenttier] || "Unknown")
+            .replace(/{rr}/g, (ranking_in_tier || 0).toString())
+            .replace(/{rrToGoal}/g, rr.toString())
+            .replace(/{goal}/g, goal);
+    }
     
     res.type('text/plain').send(finalText);
-    logToDiscord({ title: 'API Call Success: `/rank`', color: 0x00FF00, fields: [{ name: 'Player', value: `\`${name}#${tag}\``, inline: true }, { name: 'Result', value: `\`${finalText}\``, inline: false }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
+    logToDiscord({ 
+        title: 'API Call Success: `/rank`', 
+        color: 0x00FF00, 
+        fields: [
+            { name: 'Player', value: `\`${name}#${tag}\``, inline: true }, 
+            { name: 'Result', value: `\`${finalText}\``, inline: false }
+        ], 
+        timestamp: new Date().toISOString(), 
+        footer: { text: `IP: ${req.ip}` } 
+    });
 }));
 
 router.get('/wl/:name/:tag/:region', asyncHandler(async (req, res, next) => {
