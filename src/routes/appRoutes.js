@@ -147,6 +147,15 @@ router.get('/status', (req, res) => {
     }
 });
 
+router.get('/checks', (req, res) => {
+    const statusFilePath = path.join(process.cwd(), 'status_page', 'checks.html');
+    if (fs.existsSync(statusFilePath)) {
+        res.sendFile(statusFilePath);
+    } else {
+        res.status(404).send('Plik strony statusu nie został znaleziony.');
+    }
+});
+
 router.get('/api/status', async (req, res) => {
     try {
         const apiStatus = await checkApiStatus();

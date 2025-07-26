@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status API - Valorank</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        :root {
+            --bg-primary: #0f1419;
+            --bg-secondary: #1a1f2e;
+            --bg-tertiary: #252b3a;
+            --bg-card: rgba(42, 48, 60, 0.75);
+            --border-primary: #3d4450;
+            --border-secondary: rgba(255, 255, 255, 0.08);
+            --text-primary: #ffffff;
+            --text-secondary: #b5bac1;
+            --text-muted: #8a8f98;
+            --accent: #5865f2;
+            --status-operational: #57f287;
+            --status-degraded: #fee75c;
+            --status-error: #ed4245;
+            --status-maintenance: #5865f2;
+            --status-loading: #6c7a89;
+            --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --shadow-color: rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes gradient-animation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes progress-bar {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-secondary);
+            padding: 40px 0;
+            position: relative;
+            overflow: hidden;
+            border-bottom: 1px solid var(--border-secondary);
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient-primary);
+            background-size: 200% 200%;
+            animation: gradient-animation 6s ease infinite;
+        }
+
+        .status-hero {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            margin-bottom: 16px;
+        }
+
+        .status-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.4s ease;
+            flex-shrink: 0;
+        }
+
+        .status-icon::after {
+            color: white;
+            font-size: 30px;
+            font-weight: 700;
+            text-shadow: 0 0 5px rgba(0,0,0,0.3);
+        }
+
+        .status-icon.operational { 
+            background: var(--status-operational); 
+            animation: pulse 2.5s infinite ease-in-out;
+        }
+        .status-icon.operational::after { content: '✓'; }
+
+        .status-icon.degraded { 
+            background: var(--status-degraded); 
+            animation: pulse 2.5s infinite ease-in-out;
+        }
+        .status-icon.degraded::after { content: '!'; }
+
+        .status-icon.error { 
+            background: var(--status-error); 
+            animation: pulse 2.5s infinite ease-in-out;
+        }
+        .status-icon.error::after { content: '×'; }
+
+        .status-icon.loading { 
+            background: var(--status-loading); 
+            animation: spin 1s linear infinite;
+        }
+        .status-icon.loading::after { content: '⟳'; }
+
+        .status-info h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .status-description {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+        }
+
+        .last-updated {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            margin: 20px 0;
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            overflow: hidden;
+            height: 8px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--gradient-primary);
+            width: 0%;
+            transition: width 0.3s ease;
+            background-size: 200% 200%;
+            animation: gradient-animation 2s ease infinite;
+        }
+
+        /* Services Section */
+        .services-section {
+            padding: 40px 0;
+        }
+
+        .section-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 40px;
+            color: var(--text-primary);
+            text-align: center;
+        }
+
+        .endpoint-item {
+            background: var(--bg-card);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-secondary);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 20px var(--shadow-color);
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        .endpoint-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px var(--shadow-color);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .endpoint-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--status-loading);
+            transition: background-color 0.4s ease;
+        }
+
+        .endpoint-item.operational::before { background: var(--status-operational); }
+        .endpoint-item.error::before { background: var(--status-error); }
+        .endpoint-item.loading::before { 
+            background: var(--status-loading);
+            animation: pulse 1.5s infinite;
+        }
+
+        .endpoint-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .endpoint-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        .endpoint-status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .endpoint-status.operational { 
+            background: rgba(87, 242, 135, 0.15); 
+            color: var(--status-operational); 
+        }
+
+        .endpoint-status.error { 
+            background: rgba(237, 66, 69, 0.15); 
+            color: var(--status-error); 
+        }
+
+        .endpoint-status.loading { 
+            background: rgba(108, 122, 137, 0.15); 
+            color: var(--status-loading); 
+        }
+
+        .loading-spinner {
+            width: 12px;
+            height: 12px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .endpoint-details {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .endpoint-response {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            background: var(--bg-tertiary);
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 3px solid var(--accent);
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .endpoint-response.success {
+            border-left-color: var(--status-operational);
+        }
+
+        .endpoint-response.error {
+            border-left-color: var(--status-error);
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-secondary);
+            padding: 40px 0;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .footer a:hover {
+            color: var(--text-primary);
+            text-decoration: underline;
+        }
+
+        /* Controls */
+        .controls {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .btn-test {
+            background: var(--gradient-primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-size: 200% 200%;
+            animation: gradient-animation 3s ease infinite;
+        }
+
+        .btn-test:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-test:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .status-hero {
+                flex-direction: column;
+                text-align: center;
+                gap: 16px;
+            }
+            .status-info h1 { font-size: 2rem; }
+            .status-description { font-size: 1rem; }
+            .section-title { font-size: 1.8rem; margin-bottom: 32px; }
+            .endpoint-header { 
+                flex-direction: column; 
+                align-items: flex-start; 
+                gap: 12px; 
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <div class="status-hero">
+                <div class="status-icon loading" id="status-icon"></div>
+                <div class="status-info">
+                    <h1 id="main-status-text">Sprawdzanie statusu API...</h1>
+                    <p class="status-description" id="status-description">Testowanie połączeń z endpointami API w czasie rzeczywistym.</p>
+                </div>
+            </div>
+            <div class="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <div class="last-updated" id="last-updated">Inicjalizacja testów...</div>
+        </div>
+    </div>
+
+    <main class="container">
+        <div class="services-section">
+            <h2 class="section-title">Status Endpointów API</h2>
+            
+            <div class="controls">
+                <button class="btn-test" id="test-btn" onclick="runTests()">🔄 Uruchom testy ponownie</button>
+            </div>
+
+            <div id="endpoints-list">
+                <!-- Endpoints będą dodane dynamicznie -->
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>© 2025 deem. Wszelkie prawa zastrzeżone. | <a href="/">← Powrót do dokumentacji</a></p>
+        </div>
+    </footer>
+
+    <script>
+        const ENDPOINTS = [
+            {
+                name: 'GET /wl/{name}/{tag}/{region}',
+                url: '/wl/AGT%20DawcioAWP/FCB/eu',
+                description: 'Podstawowe dane o rankingu gracza'
+            },
+            {
+                name: 'GET /advanced_wl/{name}/{tag}/{region}',
+                url: '/advanced_wl/AGT%20DawcioAWP/FCB/eu',
+                description: 'Zaawansowane statystyki rankingowe'
+            },
+            {
+                name: 'GET /rank/{name}/{tag}/{region}',
+                url: '/rank/AGT%20DawcioAWP/FCB/eu',
+                description: 'Szczegółowe informacje o randze'
+            },
+            {
+                name: 'GET /getrank/{tier}',
+                url: '/getrank/1',
+                description: 'Informacje o danym tierze rankingowym'
+            },
+            {
+                name: 'GET /health',
+                url: '/health',
+                description: 'Status zdrowia aplikacji'
+            }
+        ];
+
+        const elements = {
+            mainStatusText: document.getElementById('main-status-text'),
+            statusDescription: document.getElementById('status-description'),
+            statusIcon: document.getElementById('status-icon'),
+            lastUpdated: document.getElementById('last-updated'),
+            progressBar: document.getElementById('progress-bar'),
+            endpointsList: document.getElementById('endpoints-list'),
+            testBtn: document.getElementById('test-btn')
+        };
+
+        let testResults = [];
+
+        function updateOverallStatus() {
+            const totalTests = testResults.length;
+            const passedTests = testResults.filter(r => r.success).length;
+            const failedTests = totalTests - passedTests;
+
+            let status, text, description;
+
+            if (totalTests === 0) {
+                status = 'loading';
+                text = 'Sprawdzanie statusu API...';
+                description = 'Testowanie połączeń z endpointami API w czasie rzeczywistym.';
+            } else if (failedTests === 0) {
+                status = 'operational';
+                text = 'Wszystkie endpointy działają';
+                description = `${totalTests}/${totalTests} endpointów odpowiada prawidłowo.`;
+            } else if (passedTests > 0) {
+                status = 'degraded';
+                text = 'Częściowe problemy z API';
+                description = `${passedTests}/${totalTests} endpointów działa prawidłowo.`;
+            } else {
+                status = 'error';
+                text = 'Krytyczne problemy z API';
+                description = 'Żaden z testowanych endpointów nie odpowiada.';
+            }
+
+            elements.mainStatusText.textContent = text;
+            elements.statusDescription.textContent = description;
+            elements.statusIcon.className = `status-icon ${status}`;
+        }
+
+        function createEndpointElement(endpoint, index) {
+            return `
+                <div class="endpoint-item loading" id="endpoint-${index}">
+                    <div class="endpoint-header">
+                        <div class="endpoint-name">${endpoint.name}</div>
+                        <span class="endpoint-status loading" id="status-${index}">
+                            <div class="loading-spinner"></div>
+                            Oczekiwanie
+                        </span>
+                    </div>
+                    <div class="endpoint-details">${endpoint.description}</div>
+                    <div class="endpoint-response" id="response-${index}">Oczekiwanie na test...</div>
+                </div>
+            `;
+        }
+
+        async function testEndpoint(endpoint, index) {
+            const endpointEl = document.getElementById(`endpoint-${index}`);
+            const statusEl = document.getElementById(`status-${index}`);
+            const responseEl = document.getElementById(`response-${index}`);
+
+            // Ustaw status ładowania
+            endpointEl.className = 'endpoint-item loading';
+            statusEl.innerHTML = '<div class="loading-spinner"></div>Testowanie...';
+            statusEl.className = 'endpoint-status loading';
+            responseEl.textContent = 'Wysyłanie żądania...';
+            responseEl.className = 'endpoint-response';
+
+            const startTime = Date.now();
+
+            try {
+                const response = await fetch(endpoint.url);
+                const endTime = Date.now();
+                const responseTime = endTime - startTime;
+                
+                let responseText;
+                const contentType = response.headers.get('content-type');
+                
+                if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
+                    responseText = JSON.stringify(data, null, 2);
+                } else {
+                    responseText = await response.text();
+                }
+
+                const success = response.ok;
+                
+                // Zaktualizuj UI
+                endpointEl.className = `endpoint-item ${success ? 'operational' : 'error'}`;
+                statusEl.innerHTML = success ? '✓ Działa' : '✗ Błąd';
+                statusEl.className = `endpoint-status ${success ? 'operational' : 'error'}`;
+                
+                responseEl.className = `endpoint-response ${success ? 'success' : 'error'}`;
+                responseEl.textContent = `Status: ${response.status} ${response.statusText}
+Czas odpowiedzi: ${responseTime}ms
+
+${responseText.substring(0, 500)}${responseText.length > 500 ? '...' : ''}`;
+
+                return { success, status: response.status, responseTime, endpoint: endpoint.name };
+
+            } catch (error) {
+                const endTime = Date.now();
+                const responseTime = endTime - startTime;
+
+                // Zaktualizuj UI dla błędu
+                endpointEl.className = 'endpoint-item error';
+                statusEl.innerHTML = '✗ Błąd';
+                statusEl.className = 'endpoint-status error';
+                
+                responseEl.className = 'endpoint-response error';
+                responseEl.textContent = `Błąd połączenia: ${error.message}
+Czas: ${responseTime}ms`;
+
+                return { success: false, error: error.message, responseTime, endpoint: endpoint.name };
+            }
+        }
+
+        async function runTests() {
+            testResults = [];
+            elements.testBtn.disabled = true;
+            elements.testBtn.textContent = '🔄 Testowanie...';
+            
+            // Zresetuj progress bar
+            elements.progressBar.style.width = '0%';
+            
+            // Stwórz elementy endpointów
+            elements.endpointsList.innerHTML = ENDPOINTS.map(createEndpointElement).join('');
+            
+            updateOverallStatus();
+
+            // Testuj każdy endpoint sekwencyjnie
+            for (let i = 0; i < ENDPOINTS.length; i++) {
+                const result = await testEndpoint(ENDPOINTS[i], i);
+                testResults.push(result);
+                
+                // Aktualizuj progress bar
+                const progress = ((i + 1) / ENDPOINTS.length) * 100;
+                elements.progressBar.style.width = `${progress}%`;
+                
+                updateOverallStatus();
+                
+                // Krótka pauza między testami
+                if (i < ENDPOINTS.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                }
+            }
+
+            // Finalizuj
+            const now = new Date();
+            elements.lastUpdated.textContent = `Ostatni test: ${now.toLocaleTimeString('pl-PL')}`;
+            elements.testBtn.disabled = false;
+            elements.testBtn.textContent = '🔄 Uruchom testy ponownie';
+        }
+
+        // Inicjalizacja
+        document.addEventListener('DOMContentLoaded', () => {
+            // Rozpocznij testy automatycznie po załadowaniu strony
+            setTimeout(runTests, 500);
+        });
+    </script>
+</body>
+</html>
