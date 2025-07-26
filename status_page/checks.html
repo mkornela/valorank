@@ -405,7 +405,6 @@
             </div>
 
             <div id="endpoints-list">
-                <!-- Endpoints będą dodane dynamicznie -->
             </div>
         </div>
     </main>
@@ -508,7 +507,6 @@
             const statusEl = document.getElementById(`status-${index}`);
             const responseEl = document.getElementById(`response-${index}`);
 
-            // Ustaw status ładowania
             endpointEl.className = 'endpoint-item loading';
             statusEl.innerHTML = '<div class="loading-spinner"></div>Testowanie...';
             statusEl.className = 'endpoint-status loading';
@@ -534,7 +532,6 @@
 
                 const success = response.ok;
                 
-                // Zaktualizuj UI
                 endpointEl.className = `endpoint-item ${success ? 'operational' : 'error'}`;
                 statusEl.innerHTML = success ? '✓ Działa' : '✗ Błąd';
                 statusEl.className = `endpoint-status ${success ? 'operational' : 'error'}`;
@@ -551,7 +548,6 @@ ${responseText.substring(0, 500)}${responseText.length > 500 ? '...' : ''}`;
                 const endTime = Date.now();
                 const responseTime = endTime - startTime;
 
-                // Zaktualizuj UI dla błędu
                 endpointEl.className = 'endpoint-item error';
                 statusEl.innerHTML = '✗ Błąd';
                 statusEl.className = 'endpoint-status error';
@@ -569,32 +565,26 @@ Czas: ${responseTime}ms`;
             elements.testBtn.disabled = true;
             elements.testBtn.textContent = '🔄 Testowanie...';
             
-            // Zresetuj progress bar
             elements.progressBar.style.width = '0%';
             
-            // Stwórz elementy endpointów
             elements.endpointsList.innerHTML = ENDPOINTS.map(createEndpointElement).join('');
             
             updateOverallStatus();
 
-            // Testuj każdy endpoint sekwencyjnie
             for (let i = 0; i < ENDPOINTS.length; i++) {
                 const result = await testEndpoint(ENDPOINTS[i], i);
                 testResults.push(result);
                 
-                // Aktualizuj progress bar
                 const progress = ((i + 1) / ENDPOINTS.length) * 100;
                 elements.progressBar.style.width = `${progress}%`;
                 
                 updateOverallStatus();
                 
-                // Krótka pauza między testami
                 if (i < ENDPOINTS.length - 1) {
                     await new Promise(resolve => setTimeout(resolve, 300));
                 }
             }
 
-            // Finalizuj
             const now = new Date();
             elements.lastUpdated.textContent = `Ostatni test: ${now.toLocaleTimeString('pl-PL')}`;
             elements.testBtn.disabled = false;
@@ -603,7 +593,6 @@ Czas: ${responseTime}ms`;
 
         // Inicjalizacja
         document.addEventListener('DOMContentLoaded', () => {
-            // Rozpocznij testy automatycznie po załadowaniu strony
             setTimeout(runTests, 500);
         });
     </script>
