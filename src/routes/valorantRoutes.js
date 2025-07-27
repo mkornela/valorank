@@ -59,7 +59,7 @@ router.get('/api/rank', asyncHandler(async (req, res, next) => {
 
 router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     const { name, tag, region } = req.params;
-    const { text = "{rank} ({rr} RR) | Daily: {wl} ({dailyRR} RR) | Last: {lastRR} RR", resetTime } = req.query;
+    const { text = "{rank} {rr}RR | Daily: {wl} ({dailyRR}RR) | Last: {lastRR}RR", resetTime } = req.query;
 
     if (!VALID_REGIONS.includes(region.toLowerCase())) {
         return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
@@ -77,15 +77,17 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza lub brak danych rankingowych.');
     }
     if (!account.data?.puuid) {
-        return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza.');
+        return res.status(404).type('text/plain').send('Błąd: Nie znaleziono konta gracza dla statystyk dziennych.');
     }
+
+    const history = deduplicateMatches(rawHistory);
 
     const { currenttier, ranking_in_tier } = mmr.data.current_data;
     const { rr, goal } = calculateRRToGoal(currenttier, ranking_in_tier || 0, leaderboard.data?.players);
 
-    const history = deduplicateMatches(rawHistory);
     const { startTime, endTime } = getSessionTimeRange(null, resetTime);
     const mmrHistoryArray = mmrHistory?.data?.history || [];
+
     let { wins, losses, draws, lastMatchRR, totalRRChange } = calculateSessionStats(history, mmrHistoryArray, account.data.puuid, startTime, endTime);
 
     const wlString = draws > 0 ? `${wins}W/${draws}D/${losses}L` : `${wins}W/${losses}L`;
@@ -105,7 +107,7 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
 
     const isRadiant = currenttier === 27;
     if (isRadiant) {
-        finalText = finalText.replace(/{rrToGoal} RR do {goal}/g, "Gratulacje Radianta!");
+        finalText = finalText.replace(/{rrToGoal}RR do {goal}/g, "Gratulacje Radianta!");
     }
     
     res.type('text/plain').send(finalText);

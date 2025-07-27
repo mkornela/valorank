@@ -25,24 +25,24 @@ async function startServer() {
                 });
             }
 
-            log.info('SERVER', 'Running initial stats generation on startup...');
-            generateAndSaveStats().catch(err => {
-                 log.error('SERVER', 'Initial stats generation failed.', err);
-                 logToDiscord({ title: 'Critical Error: Initial Stats Generation', color: 0xFF0000, description: `\`\`\`${err.message}\`\`\``, timestamp: new Date().toISOString() }, true);
-            });
+            //log.info('SERVER', 'Running initial stats generation on startup...');
+            //generateAndSaveStats().catch(err => {
+            //     log.error('SERVER', 'Initial stats generation failed.', err);
+            //     logToDiscord({ title: 'Critical Error: Initial Stats Generation', color: 0xFF0000, description: `\`\`\`${err.message}\`\`\``, timestamp: new Date().toISOString() }, true);
+            //});
             
-            cron.schedule('15 8 * * *', () => {
-                log.info('CRON', 'Running scheduled daily stats generation...');
-                logToDiscord({ title: 'Process: Scheduled Stats Generation', color: 0x00FFFF, description: 'Starting daily stats refresh.', timestamp: new Date().toISOString() });
-                generateAndSaveStats().catch(err => {
-                    log.error('CRON', 'Scheduled stats generation failed.', err);
-                    logToDiscord({ title: 'Error: Scheduled Stats Generation', color: 0xFF0000, description: `\`\`\`${err.message}\`\`\``, timestamp: new Date().toISOString() }, true);
-                });
-            }, {
-                scheduled: true,
-                timezone: "Europe/Warsaw"
-            });
-            log.info('CRON', 'Scheduled daily stats generation for 08:15 (Europe/Warsaw).');
+            //cron.schedule('15 8 * * *', () => {
+            //    log.info('CRON', 'Running scheduled daily stats generation...');
+            //    logToDiscord({ title: 'Process: Scheduled Stats Generation', color: 0x00FFFF, description: 'Starting daily stats refresh.', timestamp: new Date().toISOString() });
+            //    generateAndSaveStats().catch(err => {
+            //        log.error('CRON', 'Scheduled stats generation failed.', err);
+            //        logToDiscord({ title: 'Error: Scheduled Stats Generation', color: 0xFF0000, description: `\`\`\`${err.message}\`\`\``, timestamp: new Date().toISOString() }, true);
+            //    });
+            //}, {
+            //    scheduled: true,
+            //    timezone: "Europe/Warsaw"
+            //});
+            //log.info('CRON', 'Scheduled daily stats generation for 08:15 (Europe/Warsaw).');
         });
 
     } catch (error) {

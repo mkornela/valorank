@@ -31,10 +31,10 @@ const apiEndpoints = [
         params: [
             '?text="{rank} ({rr} RR) | Daily: {wl} ({dailyRR} RR) | Last: {lastRR} RR"',
             "Dostępne zmienne: {name}, {tag}, {rank}, {rr}, {rrToGoal}, {goal}, {wl}, {dailyRR}, {lastRR}",
-            "?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)"
+            "?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)" // Dodana linia
         ],
         example: {
-            request: "/rank/Szalony/123/eu?text={rank} ({rr} RR) | Daily: {dailyRR} RR",
+            request: "/rank/Szalony/123/eu?text={rank} ({rr} RR) | Daily: {dailyRR} RR&resetTime=0900",
             response: "Diament 2 (67 RR) | Daily: +33 RR"
         }
     },
