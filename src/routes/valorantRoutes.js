@@ -17,7 +17,6 @@ const asyncHandler = fn => (req, res, next) => {
         .catch(next);
 };
 
-// Helper function to deduplicate matches by match ID
 const deduplicateMatches = (matchHistory) => {
     if (!matchHistory || !matchHistory.data || !Array.isArray(matchHistory.data)) {
         return matchHistory;
@@ -26,16 +25,15 @@ const deduplicateMatches = (matchHistory) => {
     const seen = new Set();
     const uniqueMatches = matchHistory.data.filter(match => {
         const matchId = match.meta?.matchid;
-        if (!matchId) return true; // Keep matches without ID (shouldn't happen but safe)
+        if (!matchId) return true;
         
         if (seen.has(matchId)) {
-            return false; // Skip duplicate
+            return false;
         }
         seen.add(matchId);
         return true;
     });
     
-    // Log if duplicates were found
     if (uniqueMatches.length < matchHistory.data.length) {
         const duplicateCount = matchHistory.data.length - uniqueMatches.length;
         log.info('DEDUP', `Removed ${duplicateCount} duplicate matches from API response`);
@@ -61,49 +59,58 @@ router.get('/api/rank', asyncHandler(async (req, res, next) => {
 
 router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     const { name, tag, region } = req.params;
-    const { text = "{rank} ({rr} RR) | {rrToGoal} RR do {goal}" } = req.query;
+    const { text = "{rank} ({rr} RR) | Daily: {wl} ({dailyRR} RR) | Last: {lastRR} RR", resetTime } = req.query;
 
     if (!VALID_REGIONS.includes(region.toLowerCase())) {
         return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
     }
 
-    const [mmr, leaderboard] = await Promise.all([
+    const [mmr, leaderboard, account, rawHistory, mmrHistory] = await Promise.all([
         fetchPlayerMMR(name, tag, region),
-        fetchLeaderboard(region)
+        fetchLeaderboard(region),
+        fetchAccountDetails(name, tag),
+        fetchMatchHistory(name, tag, region, 'competitive', 25),
+        fetchMMRHistoryDaily(name, tag, region)
     ]);
 
     if (!mmr.data || !mmr.data.current_data) {
         return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza lub brak danych rankingowych.');
     }
+    if (!account.data?.puuid) {
+        return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza.');
+    }
 
     const { currenttier, ranking_in_tier } = mmr.data.current_data;
     const { rr, goal } = calculateRRToGoal(currenttier, ranking_in_tier || 0, leaderboard.data?.players);
+
+    const history = deduplicateMatches(rawHistory);
+    const { startTime, endTime } = getSessionTimeRange(null, resetTime);
+    const mmrHistoryArray = mmrHistory?.data?.history || [];
+    let { wins, losses, draws, lastMatchRR, totalRRChange } = calculateSessionStats(history, mmrHistoryArray, account.data.puuid, startTime, endTime);
+
+    const wlString = draws > 0 ? `${wins}W/${draws}D/${losses}L` : `${wins}W/${losses}L`;
+    const dailyRRFormatted = totalRRChange >= 0 ? `+${totalRRChange}` : totalRRChange.toString();
+    const lastRRFormatted = lastMatchRR !== null ? (lastMatchRR >= 0 ? `+${lastMatchRR}` : lastMatchRR.toString()) : 'N/A';
     
+    let finalText = text
+        .replace(/{name}/g, name)
+        .replace(/{tag}/g, tag)
+        .replace(/{rank}/g, RANK_TIERS[currenttier] || "Unknown")
+        .replace(/{rr}/g, (ranking_in_tier || 0).toString())
+        .replace(/{rrToGoal}/g, rr.toString())
+        .replace(/{goal}/g, goal)
+        .replace(/{wl}/g, wlString)
+        .replace(/{dailyRR}/g, dailyRRFormatted)
+        .replace(/{lastRR}/g, lastRRFormatted);
+
     const isRadiant = currenttier === 27;
-    
-    let finalText;
-    if (isRadiant && rr === 0) {
-        finalText = text
-            .replace(/{name}/g, name)
-            .replace(/{tag}/g, tag)
-            .replace(/{rank}/g, RANK_TIERS[currenttier] || "Unknown")
-            .replace(/{rr}/g, (ranking_in_tier || 0).toString())
-            .replace(/{rrToGoal} RR do {goal}/g, "Gratulacje Radianta!")
-            .replace(/{rrToGoal}/g, "0")
-            .replace(/{goal}/g, "MAX");
-    } else {
-        finalText = text
-            .replace(/{name}/g, name)
-            .replace(/{tag}/g, tag)
-            .replace(/{rank}/g, RANK_TIERS[currenttier] || "Unknown")
-            .replace(/{rr}/g, (ranking_in_tier || 0).toString())
-            .replace(/{rrToGoal}/g, rr.toString())
-            .replace(/{goal}/g, goal);
+    if (isRadiant) {
+        finalText = finalText.replace(/{rrToGoal} RR do {goal}/g, "Gratulacje Radianta!");
     }
     
     res.type('text/plain').send(finalText);
     logToDiscord({ 
-        title: 'API Call Success: `/rank`', 
+        title: 'API Call Success: `/rank` (extended)', 
         color: 0x00FF00, 
         fields: [
             { name: 'Player', value: `\`${name}#${tag}\``, inline: true }, 

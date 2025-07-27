@@ -25,16 +25,17 @@ const apiEndpoints = [
         }
     },
     {
-        title: "🎖️ Informacje o Randze",
+        title: "🎖️ Informacje o Randze (Rozszerzone)",
         endpoint: "GET /rank/{name}/{tag}/{region}",
-        description: "Pobierz aktualną rangę, RR i postęp do następnej rangi z personalizowanym formatowaniem tekstu.",
+        description: "Pobierz aktualną rangę, RR i postęp do następnej rangi. Endpoint został połączony z funkcjonalnością dziennych statystyk, dzięki czemu możesz dołączyć do odpowiedzi bilans wygranych/przegranych, dzienną zmianę RR oraz zmianę RR z ostatniego meczu.",
         params: [
-            '?text="{rank} ({rr} RR) | {rrToGoal} RR do {goal}"',
-            "Dostępne zmienne: {name}, {tag}, {rank}, {rr}, {rrToGoal}, {goal}"
+            '?text="{rank} ({rr} RR) | Daily: {wl} ({dailyRR} RR) | Last: {lastRR} RR"',
+            "Dostępne zmienne: {name}, {tag}, {rank}, {rr}, {rrToGoal}, {goal}, {wl}, {dailyRR}, {lastRR}",
+            "?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)"
         ],
         example: {
-            request: "/rank/Szalony/123/eu",
-            response: "Diament 2 (67 RR) | 33 RR do Diament 3"
+            request: "/rank/Szalony/123/eu?text={rank} ({rr} RR) | Daily: {dailyRR} RR",
+            response: "Diament 2 (67 RR) | Daily: +33 RR"
         }
     },
     {
