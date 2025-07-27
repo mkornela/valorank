@@ -3,6 +3,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const CHECK_INTERVAL = 5 * 60 * 1000;
     let initialHistoryData = {};
 
+    let currentDetailViewDate = null;
+    let detailUpdateInterval = null;
+
     const elements = {
         mainStatusText: document.getElementById('main-status-text'),
         statusDescription: document.getElementById('status-description'),
@@ -62,10 +65,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderTimelineSummary(history) {
+        clearInterval(detailUpdateInterval);
+        currentDetailViewDate = null;
+
         elements.timelineGrid.innerHTML = '';
         elements.timelineGrid.classList.remove('detailed-view');
         elements.backButton.style.display = 'none';
         elements.timelinePeriod.style.display = 'block';
+        elements.timelinePeriod.textContent = 'Ostatnie 90 dni';
 
         const sortedDates = Object.keys(history).sort((a, b) => new Date(a) - new Date(b));
 
@@ -75,14 +82,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const bar = document.createElement('div');
             bar.className = `timeline-bar ${config.class}`;
             bar.dataset.date = dateString;
-            bar.innerHTML = `<div class="tooltip"><strong>${formatDate(dateString)}</strong><br>Status: ${config.serviceText}</div>`;
+            bar.innerHTML = `<div class="tooltip"><strong>${formatDate(dateString)}</strong><br>Status: ${config.serviceText}<br><small>Kliknij, aby zobaczyć szczegóły</small></div>`;
             bar.addEventListener('click', () => showDetailedView(dateString));
             elements.timelineGrid.appendChild(bar);
         }
     }
 
     async function showDetailedView(dateString) {
+        clearInterval(detailUpdateInterval);
+        currentDetailViewDate = dateString;
+
         elements.timelineGrid.innerHTML = '<div class="skeleton-timeline"><div class="skeleton skeleton-bar"></div></div>';
+        elements.timelinePeriod.textContent = `Ładowanie dla: ${formatDate(dateString)}...`;
         try {
             const response = await fetch(`/api/status/details?date=${dateString}`);
             const details = await response.json();
@@ -99,10 +110,21 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.backButton.style.display = 'block';
         elements.timelinePeriod.style.display = 'none';
         
-        elements.timelinePeriod.textContent = formatDate(dateString);
+        // Zmieniamy tekst nagłówka na datę
+        document.querySelector('.timeline-header .section-title').textContent = `Szczegółowy status: ${formatDate(dateString)}`;
 
-        const totalMinutes = 24 * 60;
-        for (let i = 0; i < totalMinutes; i++) {
+        const todayDateString = new Date().toISOString().split('T')[0];
+        const isToday = (dateString === todayDateString);
+
+        let minutesToRender;
+        if (isToday) {
+            const now = new Date();
+            minutesToRender = now.getHours() * 60 + now.getMinutes();
+        } else {
+            minutesToRender = 24 * 60;
+        }
+
+        for (let i = 0; i <= minutesToRender; i++) {
             const hour = Math.floor(i / 60).toString().padStart(2, '0');
             const minute = (i % 60).toString().padStart(2, '0');
             const timeString = `${hour}:${minute}`;
@@ -115,6 +137,43 @@ document.addEventListener('DOMContentLoaded', () => {
             block.className = `timeline-block ${config.class}`;
             block.innerHTML = `<div class="tooltip">${timeString}<br>Status: ${config.serviceText}</div>`;
             elements.timelineGrid.appendChild(block);
+        }
+
+        if (isToday) {
+            startLiveUpdate();
+        }
+    }
+
+    function startLiveUpdate() {
+        clearInterval(detailUpdateInterval);
+        detailUpdateInterval = setInterval(appendLatestMinute, 60000); 
+    }
+    
+    async function appendLatestMinute() {
+        if (!currentDetailViewDate) return;
+
+        try {
+            const response = await fetch(`/api/status/details?date=${currentDetailViewDate}`);
+            const details = await response.json();
+            
+            const now = new Date();
+            const timeString = now.toTimeString().split(' ')[0].substring(0, 5);
+
+            const currentBlockCount = elements.timelineGrid.children.length;
+            const expectedBlockCount = now.getHours() * 60 + now.getMinutes();
+            if (currentBlockCount > expectedBlockCount) return;
+
+            const data = details[timeString];
+            const status = data ? data.status : 'no-data';
+            const config = STATUS_CONFIG[status] || STATUS_CONFIG['no-data'];
+
+            const block = document.createElement('div');
+            block.className = `timeline-block ${config.class}`;
+            block.innerHTML = `<div class="tooltip">${timeString}<br>Status: ${config.serviceText}</div>`;
+            elements.timelineGrid.appendChild(block);
+
+        } catch (error) {
+            console.error("Błąd podczas dołączania minuty:", error);
         }
     }
     
@@ -130,7 +189,10 @@ document.addEventListener('DOMContentLoaded', () => {
             updateOverallStatusUI(data.overallStatus);
             renderServices(data.services);
             renderIncidents(data.incidents);
-            renderTimelineSummary(data.history);
+            
+            if (!currentDetailViewDate) {
+                renderTimelineSummary(data.history);
+            }
 
         } catch (error) {
             console.error('Błąd podczas sprawdzania statusu:', error);
@@ -142,7 +204,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    elements.backButton.addEventListener('click', () => renderTimelineSummary(initialHistoryData));
+    elements.backButton.addEventListener('click', () => {
+        document.querySelector('.timeline-header .section-title').textContent = 'Historia dostępności';
+        renderTimelineSummary(initialHistoryData);
+    });
 
     checkStatus();
     setInterval(checkStatus, CHECK_INTERVAL);
