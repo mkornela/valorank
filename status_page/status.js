@@ -1,8 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Od teraz używamy tylko jednego, głównego endpointu API
     const API_URL = '/api/status';
     const CHECK_INTERVAL = 5 * 60 * 1000;
-    const DAYS_TO_SHOW_TIMELINE = 90;
+    let initialHistoryData = {};
 
     const elements = {
         mainStatusText: document.getElementById('main-status-text'),
@@ -12,14 +11,16 @@ document.addEventListener('DOMContentLoaded', () => {
         servicesList: document.getElementById('services-list'),
         timelineGrid: document.getElementById('timeline-grid'),
         timelinePeriod: document.getElementById('timeline-period'),
-        incidentLog: document.getElementById('incident-log')
+        incidentLog: document.getElementById('incident-log'),
+        backButton: document.getElementById('back-to-summary')
     };
 
     const STATUS_CONFIG = {
         operational: { text: "Wszystkie systemy działają", description: "Wszystkie usługi działają bez zakłóceń.", serviceText: "Operacyjny", class: "operational" },
         degraded: { text: "Zdegradowana wydajność", description: "Niektóre usługi mogą działać wolniej.", serviceText: "Zdegradowany", class: "degraded" },
         error: { text: "Poważna awaria", description: "Wystąpiły krytyczne problemy z dostępnością usług.", serviceText: "Awaria", class: "error" },
-        maintenance: { text: "Planowana konserwacja", description: "Prowadzimy prace konserwacyjne.", serviceText: "Konserwacja", class: "maintenance" }
+        maintenance: { text: "Planowana konserwacja", description: "Prowadzimy prace konserwacyjne.", serviceText: "Konserwacja", class: "maintenance" },
+        'no-data': { text: "Brak danych", serviceText: "Brak Danych", class: "no-data"}
     };
 
     const formatDate = (dateString) => new Date(dateString).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -32,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderServices(services = {}) {
-        elements.servicesList.innerHTML = Object.values(services).map(service => {
+        const content = Object.values(services).map(service => {
             const config = STATUS_CONFIG[service.status] || STATUS_CONFIG.error;
             return `
                 <div class="service-item ${config.class}">
@@ -40,14 +41,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="service-name">${service.name}</div>
                         <span class="service-status ${config.class}">${config.serviceText}</span>
                     </div>
-                    <div class="service-description">${service.description}</div>
                 </div>`;
-        }).join('') || '<p>Brak skonfigurowanych usług do monitorowania.</p>';
+        }).join('');
+        elements.servicesList.innerHTML = content || '<p>Brak skonfigurowanych usług do monitorowania.</p>';
     }
-
+    
     function renderIncidents(incidents = []) {
-        if (!elements.incidentLog || incidents.length === 0) {
-            elements.incidentLog.innerHTML = '<p>Brak incydentów w ostatnim czasie.</p>';
+        if (!incidents || incidents.length === 0) {
+            elements.incidentLog.innerHTML = '<div class="incident-card"><p>Brak incydentów w ostatnim czasie.</p></div>';
             return;
         }
         elements.incidentLog.innerHTML = incidents.map(incident => {
@@ -60,51 +61,88 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
-    function renderTimeline(history = {}) {
+    function renderTimelineSummary(history) {
         elements.timelineGrid.innerHTML = '';
-        const today = new Date();
-        for (let i = DAYS_TO_SHOW_TIMELINE - 1; i >= 0; i--) {
-            const date = new Date(today);
-            date.setDate(today.getDate() - i);
-            const dateString = date.toISOString().split('T')[0];
+        elements.timelineGrid.classList.remove('detailed-view');
+        elements.backButton.style.display = 'none';
+        elements.timelinePeriod.style.display = 'block';
+
+        const sortedDates = Object.keys(history).sort((a, b) => new Date(a) - new Date(b));
+
+        for (const dateString of sortedDates) {
             const status = history[dateString] || 'no-data';
-            const statusText = STATUS_CONFIG[status]?.serviceText || 'Brak danych';
-            elements.timelineGrid.innerHTML += `
-                <div class="timeline-bar ${status}">
-                    <div class="tooltip"><strong>${formatDate(dateString)}</strong><br>Status: ${statusText}</div>
-                </div>`;
+            const config = STATUS_CONFIG[status] || STATUS_CONFIG['no-data'];
+            const bar = document.createElement('div');
+            bar.className = `timeline-bar ${config.class}`;
+            bar.dataset.date = dateString;
+            bar.innerHTML = `<div class="tooltip"><strong>${formatDate(dateString)}</strong><br>Status: ${config.serviceText}</div>`;
+            bar.addEventListener('click', () => showDetailedView(dateString));
+            elements.timelineGrid.appendChild(bar);
         }
     }
 
+    async function showDetailedView(dateString) {
+        elements.timelineGrid.innerHTML = '<div class="skeleton-timeline"><div class="skeleton skeleton-bar"></div></div>';
+        try {
+            const response = await fetch(`/api/status/details?date=${dateString}`);
+            const details = await response.json();
+            renderTimelineDetail(dateString, details);
+        } catch (error) {
+            console.error('Błąd pobierania szczegółów dnia:', error);
+            elements.timelineGrid.innerHTML = '<p class="error-message">Nie udało się załadować szczegółów.</p>';
+        }
+    }
+
+    function renderTimelineDetail(dateString, details) {
+        elements.timelineGrid.innerHTML = '';
+        elements.timelineGrid.classList.add('detailed-view');
+        elements.backButton.style.display = 'block';
+        elements.timelinePeriod.style.display = 'none';
+        
+        elements.timelinePeriod.textContent = formatDate(dateString);
+
+        const totalMinutes = 24 * 60;
+        for (let i = 0; i < totalMinutes; i++) {
+            const hour = Math.floor(i / 60).toString().padStart(2, '0');
+            const minute = (i % 60).toString().padStart(2, '0');
+            const timeString = `${hour}:${minute}`;
+            
+            const data = details[timeString];
+            const status = data ? data.status : 'no-data';
+            const config = STATUS_CONFIG[status] || STATUS_CONFIG['no-data'];
+
+            const block = document.createElement('div');
+            block.className = `timeline-block ${config.class}`;
+            block.innerHTML = `<div class="tooltip">${timeString}<br>Status: ${config.serviceText}</div>`;
+            elements.timelineGrid.appendChild(block);
+        }
+    }
+    
     async function checkStatus() {
         elements.lastUpdated.classList.add('loading');
         elements.lastUpdated.textContent = 'Aktualizowanie...';
         try {
-            // Jedno zapytanie, które pobiera wszystkie potrzebne dane
             const response = await fetch(API_URL);
-            if (!response.ok) {
-                throw new Error(`Błąd API: ${response.statusText}`);
-            }
+            if (!response.ok) throw new Error(`Błąd API: ${response.statusText}`);
             const data = await response.json();
 
-            // Renderujemy wszystkie komponenty na podstawie jednej odpowiedzi
+            initialHistoryData = data.history;
             updateOverallStatusUI(data.overallStatus);
             renderServices(data.services);
             renderIncidents(data.incidents);
-            renderTimeline(data.history);
+            renderTimelineSummary(data.history);
 
         } catch (error) {
             console.error('Błąd podczas sprawdzania statusu:', error);
             updateOverallStatusUI('error');
-            elements.servicesList.innerHTML = `<div class="service-item error"><div class="service-name">Błąd połączenia z API</div></div>`;
-            elements.incidentLog.innerHTML = `<p>Nie można załadować historii incydentów.</p>`;
-            elements.timelineGrid.innerHTML = `<p>Nie można załadować osi czasu.</p>`;
         } finally {
             const now = new Date();
             elements.lastUpdated.textContent = `Ostatnia aktualizacja: ${now.toLocaleTimeString('pl-PL')}`;
             elements.lastUpdated.classList.remove('loading');
         }
     }
+
+    elements.backButton.addEventListener('click', () => renderTimelineSummary(initialHistoryData));
 
     checkStatus();
     setInterval(checkStatus, CHECK_INTERVAL);

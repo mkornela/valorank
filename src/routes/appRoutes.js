@@ -1,5 +1,5 @@
 const express = require('express');
-const path =require('path');
+const path = require('path');
 const fs = require('fs');
 const { checkApiStatus } = require('../services/api');
 const log = require('../utils/logger');
@@ -8,6 +8,7 @@ const { logToDiscord } = require('../utils/discord');
 
 const router = express.Router();
 const STATUS_DATA_PATH = path.join(process.cwd(), 'status-data.json');
+const HISTORY_PATH = path.join(process.cwd(), 'status_history');
 
 router.get('/api/status/data', async (req, res) => {
     try {
@@ -47,11 +48,6 @@ router.post('/api/status/incidents', async (req, res) => {
         log.error('API_STATUS', 'Nie można zapisać nowego incydentu', error);
         res.status(500).json({ error: 'Błąd zapisu po stronie serwera.' });
     }
-});
-
-router.get('/', (req, res) => {
-    const docsFilePath = path.join(process.cwd(), 'docs.html');
-    res.sendFile(docsFilePath);
 });
 
 router.get('/statystyki', (req, res) => {
@@ -138,72 +134,6 @@ router.get('/health', async (req, res) => { // Endpoint jest teraz asynchroniczn
     }
 });
 
-router.get('/status', (req, res) => {
-    const statusFilePath = path.join(process.cwd(), 'status_page', 'status.html');
-    if (fs.existsSync(statusFilePath)) {
-        res.sendFile(statusFilePath);
-    } else {
-        res.status(404).send('Plik strony statusu nie został znaleziony.');
-    }
-});
-
-router.get('/checks', (req, res) => {
-    const statusFilePath = path.join(process.cwd(), 'status_page', 'checks.html');
-    if (fs.existsSync(statusFilePath)) {
-        res.sendFile(statusFilePath);
-    } else {
-        res.status(404).send('Plik strony statusu nie został znaleziony.');
-    }
-});
-
-router.get('/api/status', async (req, res) => {
-    try {
-        const apiStatus = await checkApiStatus();
-        const statsFileExists = fs.existsSync(path.join(process.cwd(), 'valorant_stats.html'));
-
-        const automatedChecks = {
-            henrik_api: {
-                name: 'Zewnętrzne API (Henrik)',
-                description: 'Kluczowe API dostarczające dane o grze.',
-                status: apiStatus.reachable ? 'operational' : 'error'
-            },
-            stats_file: {
-                name: 'Generator Statystyk',
-                description: 'Proces generowania plików ze statystykami.',
-                status: statsFileExists ? 'operational' : 'degraded'
-            }
-        };
-        
-        const statusDataRaw = await fs.promises.readFile(STATUS_DATA_PATH, 'utf-8');
-        const incidentData = JSON.parse(statusDataRaw);
-
-        const statusPriority = { operational: 1, maintenance: 2, degraded: 3, error: 4 };
-        let finalStatus = 'operational';
-
-        for (const key in automatedChecks) {
-            if (statusPriority[automatedChecks[key].status] > statusPriority[finalStatus]) {
-                finalStatus = automatedChecks[key].status;
-            }
-        }
-        
-        const latestIncident = incidentData.incidents[0];
-        if (latestIncident && statusPriority[latestIncident.status] > statusPriority[finalStatus]) {
-            finalStatus = latestIncident.status;
-        }
-
-        res.json({
-            overallStatus: finalStatus,
-            services: automatedChecks,
-            incidents: incidentData.incidents,
-            history: incidentData.history
-        });
-
-    } catch (error) {
-        log.error('API_STATUS', 'Krytyczny błąd podczas pobierania danych statusu', error);
-        res.status(500).json({ error: 'Nie udało się pobrać danych statusu.' });
-    }
-});
-
 //REQUIRED BY RIOT FOR ME TO OBTAIN THEIR API KEY
 //REQUIRED BY RIOT FOR ME TO OBTAIN THEIR API KEY
 //REQUIRED BY RIOT FOR ME TO OBTAIN THEIR API KEY
@@ -219,5 +149,98 @@ router.get('/riot.txt', (req, res) => {
         res.status(404).send('Riot verification file not found');
     }
 });
+
+router.get('/api/status/details', async (req, res) => {
+    const { date } = req.query;
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return res.status(400).json({ error: 'Nieprawidłowy format daty. Oczekiwano YYYY-MM-DD.' });
+    }
+    const filePath = path.join(HISTORY_PATH, `${date}.json`);
+    try {
+        const dayDataRaw = await fs.promises.readFile(filePath, 'utf-8');
+        res.setHeader('Content-Type', 'application/json');
+        res.send(dayDataRaw);
+    } catch (error) {
+        log.warn('API_STATUS_DETAILS', `Brak pliku historii dla daty: ${date}`);
+        res.json({});
+    }
+});
+
+router.get('/api/status', async (req, res) => {
+    try {
+        const apiStatus = await checkApiStatus();
+        const statsFileExists = fs.existsSync(path.join(process.cwd(), 'valorant_stats.html'));
+
+        const automatedChecks = {
+            henrik_api: { name: 'Zewnętrzne API (Henrik)', description: 'Kluczowe API dostarczające dane o grze.', status: apiStatus.reachable ? 'operational' : 'error' },
+            stats_file: { name: 'Generator Statystyk', description: 'Proces generowania plików ze statystykami.', status: statsFileExists ? 'operational' : 'degraded' }
+        };
+        
+        const statusDataRaw = await fs.promises.readFile(STATUS_DATA_PATH, 'utf-8');
+        const incidentData = JSON.parse(statusDataRaw);
+
+        const history = {};
+        const today = new Date();
+        for (let i = 89; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(today.getDate() - i);
+            const dateString = date.toISOString().split('T')[0];
+            const filePath = path.join(HISTORY_PATH, `${dateString}.json`);
+            
+            try {
+                const dayDataRaw = await fs.promises.readFile(filePath, 'utf-8');
+                const dayData = JSON.parse(dayDataRaw);
+                const statuses = Object.values(dayData).map(v => v.status);
+                
+                if (statuses.some(s => s === 'error')) history[dateString] = 'error';
+                else if (statuses.some(s => s === 'degraded')) history[dateString] = 'degraded';
+                else history[dateString] = 'operational';
+            } catch (error) {
+                history[dateString] = 'no-data';
+            }
+        }
+
+        const statusPriority = { operational: 1, maintenance: 2, degraded: 3, error: 4 };
+        let finalStatus = 'operational';
+        Object.values(automatedChecks).forEach(check => {
+            if (statusPriority[check.status] > statusPriority[finalStatus]) finalStatus = check.status;
+        });
+        
+        const latestIncident = incidentData.incidents[0];
+        if (latestIncident && statusPriority[latestIncident.status] > statusPriority[finalStatus]) {
+            finalStatus = latestIncident.status;
+        }
+
+        res.json({
+            overallStatus: finalStatus,
+            services: automatedChecks,
+            incidents: incidentData.incidents.slice(0, 10),
+            history: history
+        });
+
+    } catch (error) {
+        log.error('API_STATUS', 'Krytyczny błąd podczas pobierania danych statusu', error);
+        res.status(500).json({ error: 'Nie udało się pobrać danych statusu.' });
+    }
+});
+
+router.get('/', (req, res) => {
+    const docsFilePath = path.join(process.cwd(), 'docs.html');
+    res.sendFile(docsFilePath);
+});
+
+router.get('/status', (req, res) => {
+    const statusFilePath = path.join(process.cwd(), 'status_page', 'status.html');
+    if (fs.existsSync(statusFilePath)) res.sendFile(statusFilePath);
+    else res.status(404).send('Plik strony statusu nie został znaleziony.');
+});
+
+router.get('/checks', (req, res) => {
+    const statusFilePath = path.join(process.cwd(), 'status_page', 'checks.html');
+    if (fs.existsSync(statusFilePath)) res.sendFile(statusFilePath);
+    else res.status(404).send('Plik strony statusu nie został znaleziony.');
+});
+
+module.exports = router;
 
 module.exports = router;
