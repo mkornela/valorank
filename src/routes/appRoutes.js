@@ -242,5 +242,3 @@ router.get('/checks', (req, res) => {
 });
 
 module.exports = router;
-
-module.exports = router;
