@@ -181,7 +181,7 @@ router.get('/logs/api', (req, res) => {
         };
 
         res.json({
-            logs: logs.slice(0, 100), // Ostatnie 100 logów
+            logs: logs.slice(0, 100),
             stats: stats,
             timestamp: new Date().toISOString()
         });
