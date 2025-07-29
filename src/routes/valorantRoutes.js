@@ -65,24 +65,24 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
     }
 
-    const [mmr, leaderboard, account, rawHistory, mmrHistory] = await Promise.all([
-        fetchPlayerMMR(name, tag, region),
+    const [/*mmr,*/ leaderboard, account, rawHistory, mmrHistory] = await Promise.all([
+        //fetchPlayerMMR(name, tag, region),
         fetchLeaderboard(region),
         fetchAccountDetails(name, tag),
         fetchMatchHistory(name, tag, region, 'competitive', 25),
         fetchMMRHistoryDaily(name, tag, region)
     ]);
 
-    if (!mmr.data || !mmr.data.current_data) {
-        return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza lub brak danych rankingowych.');
-    }
+    //if (!mmr.data || !mmr.data.current_data) {
+    //    return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza lub brak danych rankingowych.');
+    //}
     if (!account.data?.puuid) {
         return res.status(404).type('text/plain').send('Błąd: Nie znaleziono konta gracza dla statystyk dziennych.');
     }
 
     const history = deduplicateMatches(rawHistory);
 
-    const { currenttier, ranking_in_tier } = mmr.data.current_data;
+    //const { currenttier, ranking_in_tier } = mmr.data.current_data;
     const { rr, goal } = calculateRRToGoal(currenttier, ranking_in_tier || 0, leaderboard.data?.players);
 
     const { startTime, endTime } = getSessionTimeRange(null, resetTime);
@@ -97,18 +97,18 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     let finalText = text
         .replace(/{name}/g, name)
         .replace(/{tag}/g, tag)
-        .replace(/{rank}/g, RANK_TIERS[currenttier] || "Unknown")
-        .replace(/{rr}/g, (ranking_in_tier || 0).toString())
+        //.replace(/{rank}/g, RANK_TIERS[currenttier] || "Unknown")
+        //.replace(/{rr}/g, (ranking_in_tier || 0).toString())
         .replace(/{rrToGoal}/g, rr.toString())
         .replace(/{goal}/g, goal)
         .replace(/{wl}/g, wlString)
         .replace(/{dailyRR}/g, dailyRRFormatted)
         .replace(/{lastRR}/g, lastRRFormatted);
 
-    const isRadiant = currenttier === 27;
-    if (isRadiant) {
-        finalText = finalText.replace(/{rrToGoal}RR do {goal}/g, "Gratulacje Radianta!");
-    }
+    //const isRadiant = currenttier === 27;
+    //if (isRadiant) {
+    //    finalText = finalText.replace(/{rrToGoal}RR do {goal}/g, "Gratulacje Radianta!");
+    //}
     
     res.type('text/plain').send(finalText);
     logToDiscord({ 
