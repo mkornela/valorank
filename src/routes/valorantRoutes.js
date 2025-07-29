@@ -83,7 +83,7 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     const history = deduplicateMatches(rawHistory);
 
     //const { currenttier, ranking_in_tier } = mmr.data.current_data;
-    const { rr, goal } = calculateRRToGoal(currenttier, ranking_in_tier || 0, leaderboard.data?.players);
+    //const { rr, goal } = calculateRRToGoal(currenttier, ranking_in_tier || 0, leaderboard.data?.players);
 
     const { startTime, endTime } = getSessionTimeRange(null, resetTime);
     const mmrHistoryArray = mmrHistory?.data?.history || [];
@@ -99,8 +99,8 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         .replace(/{tag}/g, tag)
         //.replace(/{rank}/g, RANK_TIERS[currenttier] || "Unknown")
         //.replace(/{rr}/g, (ranking_in_tier || 0).toString())
-        .replace(/{rrToGoal}/g, rr.toString())
-        .replace(/{goal}/g, goal)
+        //.replace(/{rrToGoal}/g, rr.toString())
+        //.replace(/{goal}/g, goal)
         .replace(/{wl}/g, wlString)
         .replace(/{dailyRR}/g, dailyRRFormatted)
         .replace(/{lastRR}/g, lastRRFormatted);
