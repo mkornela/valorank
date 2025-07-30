@@ -73,6 +73,12 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         fetchMMRHistoryDaily(name, tag, region)
     ]);
 
+    let lastStatsRaw;
+    rawHistory.data[0].players.forEach(player => {
+        if(player.name == name) lastStatsRaw = player;
+    })
+
+
     if (!mmr.data || !mmr.data.current_data) {
         return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza lub brak danych rankingowych.');
     }
@@ -93,6 +99,9 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     const wlString = draws > 0 ? `${wins}W/${draws}D/${losses}L` : `${wins}W/${losses}L`;
     const dailyRRFormatted = totalRRChange >= 0 ? `+${totalRRChange}` : totalRRChange.toString();
     const lastRRFormatted = lastMatchRR !== null ? (lastMatchRR >= 0 ? `+${lastMatchRR}` : lastMatchRR.toString()) : '-';
+
+    const lastStats = `${lastStatsRaw.stats.kills}/${lastStatsRaw.stats.deaths}/${lastStatsRaw.stats.assists}`;
+    const lastAgent = lastStatsRaw.agent.name;
     
     let finalText = text
         .replace(/{name}/g, name)
@@ -103,7 +112,9 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         .replace(/{goal}/g, goal)
         .replace(/{wl}/g, wlString)
         .replace(/{dailyRR}/g, dailyRRFormatted)
-        .replace(/{lastRR}/g, lastRRFormatted);
+        .replace(/{lastRR}/g, lastRRFormatted)
+        .replace(/{lastStats}/g, lastStats)
+        .replace(/{lastAgent}/g, lastAgent);
 
     const isRadiant = currenttier === 27;
     if (isRadiant) {
