@@ -27,15 +27,15 @@ const apiEndpoints = [
     {
         title: "🎖️ Informacje o Randze (Rozszerzone)",
         endpoint: "GET /rank/{name}/{tag}/{region}",
-        description: "Pobierz aktualną rangę, RR i postęp do następnej rangi. Endpoint został połączony z funkcjonalnością dziennych statystyk, dzięki czemu możesz dołączyć do odpowiedzi bilans wygranych/przegranych, dzienną zmianę RR oraz zmianę RR z ostatniego meczu.",
+        description: "Pobierz aktualną rangę, RR i postęp do następnej rangi. Endpoint został połączony z funkcjonalnością dziennych statystyk, dzięki czemu możesz dołączyć do odpowiedzi bilans wygranych/przegranych, dzienną zmianę RR, zmianę RR z ostatniego meczu, a także statystyki (K/D/A) i agenta z ostatniej gry.",
         params: [
-            '?text="{rank} ({rr} RR) | Daily: {wl} ({dailyRR} RR) | Last: {lastRR} RR"',
-            "Dostępne zmienne: {name}, {tag}, {rank}, {rr}, {rrToGoal}, {goal}, {wl}, {dailyRR}, {lastRR}",
-            "?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)" // Dodana linia
+            '?text="{rank} ({rr} RR) | Ostatnia gra: {lastStats} jako {lastAgent}"',
+            "Dostępne zmienne: {name}, {tag}, {rank}, {rr}, {rrToGoal}, {goal}, {wl}, {dailyRR}, {lastRR}, {lastStats}, {lastAgent}",
+            "?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)"
         ],
         example: {
-            request: "/rank/Szalony/123/eu?text={rank} ({rr} RR) | Daily: {dailyRR} RR&resetTime=0900",
-            response: "Diament 2 (67 RR) | Daily: +33 RR"
+            request: "/rank/Szalony/123/eu?text={rank} ({rr}RR) | Ostatnio: {lastAgent} ({lastStats})",
+            response: "Diament 2 (67RR) | Ostatnio: Jett (21/15/8)"
         }
     },
     {
