@@ -36,11 +36,40 @@ const EVENTS = {
     'VCT 2025: Americas Stage 2': 'VCT Americas Stage 2'
 }
 
+const RANK_ELO_THRESHOLDS = {
+    'Iron 1': 0,
+    'Iron 2': 100,
+    'Iron 3': 200,
+    'Bronze 1': 300,
+    'Bronze 2': 400,
+    'Bronze 3': 500,
+    'Silver 1': 600,
+    'Silver 2': 700,
+    'Silver 3': 800,
+    'Gold 1': 900,
+    'Gold 2': 1000,
+    'Gold 3': 1100,
+    'Platinum 1': 1200,
+    'Platinum 2': 1300,
+    'Platinum 3': 1400,
+    'Diamond 1': 1500,
+    'Diamond 2': 1600,
+    'Diamond 3': 1700,
+    'Ascendant 1': 1800,
+    'Ascendant 2': 1900,
+    'Ascendant 3': 2000,
+    'Immortal 1': 2100,
+    'Immortal 2': 2200,
+    'Immortal 3': 2300,
+    'Radiant': 2650
+};
+
 module.exports = {
     RANK_TIERS,
     VALID_REGIONS,
     RADIANT_BASE_THRESHOLD,
     MAX_MATCHES_PER_REQUEST,
     TEAMS,
-    EVENTS
+    EVENTS,
+    RANK_ELO_THRESHOLDS
 };

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { VALID_REGIONS, RANK_TIERS, TEAMS, EVENTS } = require('../constants');
+const { VALID_REGIONS, RANK_TIERS, TEAMS, EVENTS, RANK_ELO_THRESHOLDS } = require('../constants');
 const { logToDiscord } = require('../utils/discord');
 const { getSessionTimeRange, formatMatchDateTimeShort, getTimeUntilMatch, formatMatchDateTimeShortHour } = require('../utils/time');
 const { fetchAccountDetails, fetchMatchHistory, fetchPlayerMMR, fetchLeaderboard, fetchMMRHistory, fetchMMRHistoryDaily } = require('../services/api');
@@ -15,6 +15,20 @@ const asyncHandler = fn => (req, res, next) => {
     return Promise
         .resolve(fn(req, res, next))
         .catch(next);
+};
+
+const calculateEloToCustomGoal = (currentElo, goalRank) => {
+    const goalElo = RANK_ELO_THRESHOLDS[goalRank];
+    if (goalElo === undefined) {
+        return null; // Nieprawidłowa nazwa rangi
+    }
+    
+    const eloNeeded = goalElo - currentElo;
+    return {
+        eloNeeded: Math.max(0, eloNeeded), // Nie może być ujemne
+        goalElo: goalElo,
+        alreadyReached: eloNeeded <= 0
+    };
 };
 
 const deduplicateMatches = (matchHistory) => {
@@ -59,7 +73,7 @@ router.get('/api/rank', asyncHandler(async (req, res, next) => {
 
 router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     const { name, tag, region } = req.params;
-    const { text = "{rank} {rr}RR | Daily: {wl} ({dailyRR}RR) | Last: {lastRR}RR", resetTime } = req.query;
+    const { text = "{rank} {rr}RR | Daily: {wl} ({dailyRR}RR) | Last: {lastRR}RR", resetTime, goalRank } = req.query;
 
     if (!VALID_REGIONS.includes(region.toLowerCase())) {
         return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
@@ -78,7 +92,6 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         if(player.name == name) lastStatsRaw = player;
     })
 
-
     if (!mmr.data || !mmr.data.current_data) {
         return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza lub brak danych rankingowych.');
     }
@@ -88,8 +101,32 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
 
     const history = deduplicateMatches(rawHistory);
 
-    const { currenttier, ranking_in_tier } = mmr.data.current_data;
-    const { rr, goal } = calculateRRToGoal(currenttier, ranking_in_tier || 0, leaderboard.data?.players);
+    const { currenttier, ranking_in_tier, elo } = mmr.data.current_data;
+    
+    let rr, goal, rrToGoal;
+    
+    if (goalRank) {
+        // Użyj customowego celu
+        const customGoal = calculateEloToCustomGoal(elo, goalRank);
+        if (customGoal === null) {
+            return res.status(400).type('text/plain').send(`Błąd: Nieprawidłowa nazwa rangi "${goalRank}". Dostępne rangi: ${Object.keys(RANK_ELO_THRESHOLDS).join(', ')}`);
+        }
+        
+        rrToGoal = customGoal.eloNeeded;
+        goal = goalRank;
+        rr = rrToGoal;
+        
+        if (customGoal.alreadyReached) {
+            goal = `${goalRank} (już osiągnięte!)`;
+            rrToGoal = 0;
+        }
+    } else {
+        // Użyj oryginalnej logiki (następna ranga)
+        const originalGoal = calculateRRToGoal(currenttier, ranking_in_tier || 0, leaderboard.data?.players);
+        rr = originalGoal.rr;
+        goal = originalGoal.goal;
+        rrToGoal = rr;
+    }
 
     const { startTime, endTime } = getSessionTimeRange(null, resetTime);
     const mmrHistoryArray = mmrHistory?.data?.history || [];
@@ -108,7 +145,7 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         .replace(/{tag}/g, tag)
         .replace(/{rank}/g, RANK_TIERS[currenttier] || "Unknown")
         .replace(/{rr}/g, (ranking_in_tier || 0).toString())
-        .replace(/{rrToGoal}/g, rr.toString())
+        .replace(/{rrToGoal}/g, rrToGoal.toString())
         .replace(/{goal}/g, goal)
         .replace(/{wl}/g, wlString)
         .replace(/{dailyRR}/g, dailyRRFormatted)
@@ -117,8 +154,13 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         .replace(/{lastAgent}/g, lastAgent);
 
     const isRadiant = currenttier === 27;
-    if (isRadiant) {
+    if (isRadiant && !goalRank) {
         finalText = finalText.replace(/{rrToGoal}RR do {goal}/g, "Gratulacje Radianta!");
+    }
+    
+    // Jeśli cel został już osiągnięty, zastąp komunikat
+    if (goalRank && rrToGoal === 0) {
+        finalText = finalText.replace(/{rrToGoal}RR do {goal}/g, `Cel "${goalRank}" już osiągnięty!`);
     }
     
     res.type('text/plain').send(finalText);
@@ -127,6 +169,7 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         color: 0x00FF00, 
         fields: [
             { name: 'Player', value: `\`${name}#${tag}\``, inline: true }, 
+            { name: 'Custom Goal', value: goalRank ? `\`${goalRank}\`` : 'Default (next rank)', inline: true },
             { name: 'Result', value: `\`${finalText}\``, inline: false }
         ], 
         timestamp: new Date().toISOString(), 
