@@ -256,11 +256,11 @@ function generateHTML(dailyStats, playerInfo) {
                     const tierName = currentRankData.currenttierpatched;
                     const rr = currentRankData.ranking_in_tier;
                     const lastChange = currentRankData.mmr_change_to_last_game;
-                    const elo = currentRankData.elo;
+                    const elo = data.mmr.data.current_data.ranking_in_tier;
                     
                     const progress = tierName === 'Immortal 3' ? (rr / 550) * 100 : (rr / 100) * 100;
                     
-                    const rankPanelHtml = \`<div class="rank-icon"><img src="\${TIER_ICONS[tierId] || ''}" alt="\${tierName || 'Unknown Rank'}"></div><div class="rank-details"><div class="rank-name">\${tierName || 'Brak Danych'}</div><div class="rank-rr">\${rr} RR (\${elo} MMR) <span class="rr-change \${lastChange >= 0 ? 'rr-change-positive' : 'rr-change-negative'}">(\${lastChange >= 0 ? '+' : ''}\${lastChange})</span></div><div class="progress-bar-wrapper"><div class="progress-bar"><div class="progress-bar-inner" style="width: \${progress}%"></div></div></div></div>\`;
+                    const rankPanelHtml = \`<div class="rank-icon"><img src="\${TIER_ICONS[tierId] || ''}" alt="\${tierName || 'Unknown Rank'}"></div><div class="rank-details"><div class="rank-name">\${tierName || 'Brak Danych'}</div><div class="rank-rr">\${rr}RR <span class="rr-change \${lastChange >= 0 ? 'rr-change-positive' : 'rr-change-negative'}">(\${lastChange >= 0 ? '+' : ''}\${lastChange})</span></div><div class="progress-bar-wrapper"><div class="progress-bar"><div class="progress-bar-inner" style="width: \${progress}%"></div></div></div></div>\`;
                     placeholder.innerHTML = rankPanelHtml;
                 } else { 
                     placeholder.innerHTML = '<p>Nie udało się załadować danych o randze. API zwróciło niekompletne dane.</p>'; 
