@@ -30,7 +30,7 @@ const apiEndpoints = [
         description: "Pobierz aktualną rangę, RR i postęp do następnej rangi. Endpoint został połączony z funkcjonalnością dziennych statystyk, dzięki czemu możesz dołączyć do odpowiedzi bilans wygranych/przegranych, dzienną zmianę RR, zmianę RR z ostatniego meczu, a także statystyki (K/D/A) i agenta z ostatniej gry.",
         params: [
             '?text="{rank} ({rr} RR) | Ostatnia gra: {lastStats} jako {lastAgent}"',
-            "Dostępne zmienne: {name}, {tag}, {rank}, {rr}, {rrToGoal}, {goal}, {wl}, {dailyRR}, {lastRR}, {lastStats}, {lastAgent}",
+            "Dostępne zmienne: {name}, {tag}, {lb}, {rank}, {rr}, {rrToGoal}, {goal}, {wl}, {dailyRR}, {lastRR}, {lastStats}, {lastAgent}",
             "?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)"
         ],
         example: {
