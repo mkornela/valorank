@@ -189,6 +189,31 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     });
 }));
 
+router.get('/rankraw/:name/:tag/:region', asyncHandler(async (req, res, next) => {
+    const { name, tag, region } = req.params;
+
+    if (!VALID_REGIONS.includes(region.toLowerCase())) {
+        return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
+    }
+
+    const [mmr, account] = await Promise.all([
+        fetchPlayerMMR(name, tag, region),
+        fetchAccountDetails(name, tag)
+    ]);
+    
+    res.type('text/plain').send({ mmr, account });
+    logToDiscord({ 
+        title: 'API Call Success: `/rankraw` (extended)', 
+        color: 0x00FF00, 
+        fields: [
+            { name: 'Player', value: `\`${name}#${tag}\``, inline: true }, 
+            { name: 'Result', value: `\`${ mmr, account }\``, inline: false }
+        ], 
+        timestamp: new Date().toISOString(), 
+        footer: { text: `IP: ${req.ip}` } 
+    });
+}));
+
 router.get('/wl/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     const { name, tag, region } = req.params;
     const { resetTime, sessionStart } = req.query;

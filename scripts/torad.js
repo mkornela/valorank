@@ -244,24 +244,23 @@ function generateHTML(dailyStats, playerInfo) {
         const TIER_ICONS = ${JSON.stringify(TIER_ICONS)};
         document.addEventListener('DOMContentLoaded', () => {
             const placeholder = document.getElementById('rank-panel-placeholder');
-            // For TORAD, we'll use a different API endpoint or handle rank data differently
-            // You might want to modify this part based on your API setup
-            fetch('https://api.valo.lol/api/torad-rank').then(response => { 
+            fetch('https://api.valo.lol/rankraw/TIER%202%20DEMON/TIER1/eu').then(response => { 
                 if (!response.ok) { 
                     throw new Error(\`Network response was not ok, status: \${response.status}\`); 
                 } 
                 return response.json(); 
             }).then(data => {
-                if (data && data.current_data && data.current_data.currenttierpatched) {
-                    const currentRankData = data.current_data;
+                if (data && data.mmr && data.mmr.data && data.mmr.data.current_data && data.mmr.data.current_data.currenttierpatched) {
+                    const currentRankData = data.mmr.data.current_data;
                     const tierId = currentRankData.currenttier;
                     const tierName = currentRankData.currenttierpatched;
                     const rr = currentRankData.ranking_in_tier;
                     const lastChange = currentRankData.mmr_change_to_last_game;
+                    const elo = currentRankData.elo;
                     
                     const progress = tierName === 'Immortal 3' ? (rr / 550) * 100 : (rr / 100) * 100;
                     
-                    const rankPanelHtml = \`<div class="rank-icon"><img src="\${TIER_ICONS[tierId] || ''}" alt="\${tierName || 'Unknown Rank'}"></div><div class="rank-details"><div class="rank-name">\${tierName || 'Brak Danych'}</div><div class="rank-rr">\${rr} RR <span class="rr-change \${lastChange >= 0 ? 'rr-change-positive' : 'rr-change-negative'}">(\${lastChange >= 0 ? '+' : ''}\${lastChange})</span></div><div class="progress-bar-wrapper"><div class="progress-bar"><div class="progress-bar-inner" style="width: \${progress}%"></div></div></div></div>\`;
+                    const rankPanelHtml = \`<div class="rank-icon"><img src="\${TIER_ICONS[tierId] || ''}" alt="\${tierName || 'Unknown Rank'}"></div><div class="rank-details"><div class="rank-name">\${tierName || 'Brak Danych'}</div><div class="rank-rr">\${rr} RR (\${elo} MMR) <span class="rr-change \${lastChange >= 0 ? 'rr-change-positive' : 'rr-change-negative'}">(\${lastChange >= 0 ? '+' : ''}\${lastChange})</span></div><div class="progress-bar-wrapper"><div class="progress-bar"><div class="progress-bar-inner" style="width: \${progress}%"></div></div></div></div>\`;
                     placeholder.innerHTML = rankPanelHtml;
                 } else { 
                     placeholder.innerHTML = '<p>Nie udało się załadować danych o randze. API zwróciło niekompletne dane.</p>'; 
