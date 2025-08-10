@@ -71,6 +71,10 @@ router.get('/api/rank', asyncHandler(async (req, res, next) => {
     }
 }));
 
+function findPlayer(leaderboard, name, tag) {
+    return Array(leaderboard).find(player => player.name === name && player.tag === tag);
+}
+
 router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     const { name, tag, region } = req.params;
     const { text = "{rank} {rr}RR | Daily: {wl} ({dailyRR}RR) | Last: {lastRR}RR", resetTime, goalRank } = req.query;
@@ -86,6 +90,10 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         fetchMatchHistory(name, tag, region, 'competitive', 25),
         fetchMMRHistoryDaily(name, tag, region)
     ]);
+
+    // console.log(name, tag)
+    // let playerLB = findPlayer(leaderboard, name, tag);
+    // console.log(playerLB);
 
     let lastStatsRaw;
     rawHistory.data[0].players.forEach(player => {
@@ -121,7 +129,6 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
             rrToGoal = 0;
         }
     } else {
-        // Użyj oryginalnej logiki (następna ranga)
         const originalGoal = calculateRRToGoal(currenttier, ranking_in_tier || 0, leaderboard.data?.players);
         rr = originalGoal.rr;
         goal = originalGoal.goal;
