@@ -72,7 +72,9 @@ router.get('/api/rank', asyncHandler(async (req, res, next) => {
 }));
 
 function findPlayer(leaderboard, name, tag) {
-    return Array(leaderboard).find(player => player.name === name && player.tag === tag);
+    let player = leaderboard.find(player => player.name === name && player.tag === tag);
+    if(!player) return 'Not found';
+    return player;
 }
 
 router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
@@ -90,10 +92,6 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         fetchMatchHistory(name, tag, region, 'competitive', 25),
         fetchMMRHistoryDaily(name, tag, region)
     ]);
-
-    // console.log(name, tag)
-    // let playerLB = findPlayer(leaderboard, name, tag);
-    // console.log(playerLB);
 
     let lastStatsRaw;
     rawHistory.data[0].players.forEach(player => {
@@ -114,7 +112,6 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     let rr, goal, rrToGoal;
     
     if (goalRank) {
-        // Użyj customowego celu
         const customGoal = calculateEloToCustomGoal(elo, goalRank);
         if (customGoal === null) {
             return res.status(400).type('text/plain').send(`Błąd: Nieprawidłowa nazwa rangi "${goalRank}". Dostępne rangi: ${Object.keys(RANK_ELO_THRESHOLDS).join(', ')}`);
@@ -146,10 +143,18 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
 
     const lastStats = `${lastStatsRaw.stats.kills}/${lastStatsRaw.stats.deaths}/${lastStatsRaw.stats.assists}`;
     const lastAgent = lastStatsRaw.agent.name;
+
+    let playerLB = await findPlayer(leaderboard.data.players, name, tag);
+    if(playerLB != 'Not found') {
+        playerLB = `#${playerLB.leaderboard_rank}`;
+    } else {
+        playerLB = ``;
+    }
     
     let finalText = text
         .replace(/{name}/g, name)
         .replace(/{tag}/g, tag)
+        .replace(/{lb}/g, playerLB)
         .replace(/{rank}/g, RANK_TIERS[currenttier] || "Unknown")
         .replace(/{rr}/g, (ranking_in_tier || 0).toString())
         .replace(/{rrToGoal}/g, rrToGoal.toString())
