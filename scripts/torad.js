@@ -1,0 +1,308 @@
+require('dotenv').config();
+const fs = require('fs');
+const { formatInTimeZone } = require('date-fns-tz');
+const log = require('../src/utils/logger');
+const { fetchFromHenrikApi, initFetch } = require('../src/services/api');
+const config = require('../src/config');
+const { MAX_MATCHES_PER_REQUEST } = require('../src/constants');
+
+// Torad specific configuration
+const TORAD_PLAYER_NAME = 'TIER 2 DEMON';
+const TORAD_PLAYER_TAG = 'TIER1';
+const TORAD_PLAYER_REGION = config.STATS_PLAYER_REGION || 'eu';
+const STOP_DATE = new Date('2025-08-05T08:00:00Z');
+const TIMEZONE = 'Europe/Warsaw';
+const START_DATE_FOR_LABELS = '2024-08-05';
+const OUTPUT_FILE_NAME = 'torad_valorant_stats.html';
+const MAX_API_REQUESTS = 50;
+const FETCH_INTERVAL = 2500;
+
+const TIER_ICONS = { 0: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/0/largeicon.png',3: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/3/largeicon.png',4: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/4/largeicon.png',5: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/5/largeicon.png',6: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/6/largeicon.png',7: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/7/largeicon.png',8: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/8/largeicon.png',9: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/9/largeicon.png',10: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/10/largeicon.png',11: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/11/largeicon.png',12: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/12/largeicon.png',13: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/13/largeicon.png',14: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/14/largeicon.png',15: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/15/largeicon.png',16: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/16/largeicon.png',17: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/17/largeicon.png',18: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/18/largeicon.png',19: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/19/largeicon.png',20: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/20/largeicon.png',21: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/21/largeicon.png',22: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/22/largeicon.png',23: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/23/largeicon.png',24: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/24/largeicon.png',25: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/25/largeicon.png',26: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/26/largeicon.png',27: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/27/largeicon.png', };
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function fetchAllMatchesUntilDate() {
+    const allMatches = [];
+    let requestCount = 0;
+    let currentStart = 0;
+    const urlPath = `/valorant/v4/matches/${TORAD_PLAYER_REGION.toLowerCase()}/pc/${encodeURIComponent(TORAD_PLAYER_NAME)}/${encodeURIComponent(TORAD_PLAYER_TAG)}`;
+    
+    log.info('TORAD', `Fetching match history for ${TORAD_PLAYER_NAME}#${TORAD_PLAYER_TAG}...`);
+
+    while (requestCount < MAX_API_REQUESTS) {
+        try {
+            const queryParams = { mode: 'competitive', size: MAX_MATCHES_PER_REQUEST.toString(), start: currentStart.toString() };
+            
+            log.info('TORAD', `Request #${requestCount + 1}/${MAX_API_REQUESTS} with start=${currentStart}`);
+            const response = await fetchFromHenrikApi(urlPath, queryParams);
+            requestCount++;
+
+            if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+                let reachedStopDate = false;
+                for (const match of response.data) {
+                    const gameStart = match.metadata && match.metadata.started_at ? new Date(match.metadata.started_at) : null;
+                    if (gameStart && !isNaN(gameStart.getTime())) {
+                        if (gameStart >= STOP_DATE) {
+                            allMatches.push(match);
+                        } else {
+                            reachedStopDate = true;
+                            break; 
+                        }
+                    }
+                }
+                
+                if (reachedStopDate || response.data.length < MAX_MATCHES_PER_REQUEST) {
+                    break;
+                }
+                
+                currentStart += MAX_MATCHES_PER_REQUEST;
+                await sleep(FETCH_INTERVAL);
+            } else {
+                break;
+            }
+        } catch (error) {
+            log.error('TORAD', `Error fetching matches on request #${requestCount}: ${error.message}`);
+            break;
+        }
+    }
+
+    log.info('TORAD', `Fetched and processed a total of ${allMatches.length} matches since ${STOP_DATE.toISOString()}.`);
+    allMatches.sort((a, b) => new Date(b.metadata.game_start_iso).getTime() - new Date(a.metadata.game_start_iso).getTime());
+    return allMatches;
+}
+
+function processMatchData(jsonData) {
+    const matches = jsonData.matches || [];
+    const dailyStats = {};
+    const rankedMatches = matches.filter(match => match.metadata.queue?.id === 'competitive');
+    rankedMatches.forEach(match => {
+        const date = formatInTimeZone(new Date(match.metadata.started_at), TIMEZONE, 'yyyy-MM-dd');
+        if (!dailyStats[date]) {
+            dailyStats[date] = { matches: 0, wins: 0, losses: 0, kills: 0, deaths: 0 };
+        }
+        const playerData = match.players.find(p => p.name === jsonData.player.name && p.tag === jsonData.player.tag);
+        if (playerData) {
+            dailyStats[date].matches++;
+            dailyStats[date].kills += playerData.stats.kills;
+            dailyStats[date].deaths += playerData.stats.deaths;
+            const winningTeam = match.teams.find(t => t.won);
+            if (winningTeam && winningTeam.team_id === playerData.team_id) {
+                dailyStats[date].wins++;
+            } else {
+                dailyStats[date].losses++;
+            }
+        }
+    });
+    return dailyStats;
+}
+
+function generateHTML(dailyStats, playerInfo) {
+    const dates = Object.keys(dailyStats).sort();
+    const dateToLabelMap = {};
+    let dayCounter = 1;
+    dates.forEach(date => { if (date >= START_DATE_FOR_LABELS) { dateToLabelMap[date] = `Dzień ${dayCounter}`; dayCounter++; } });
+    const chartLabels = dates.map(date => dateToLabelMap[date] || date);
+    const rankedMatches = Object.values(dailyStats).reduce((sum, day) => sum + day.matches, 0);
+    const totalWins = Object.values(dailyStats).reduce((sum, day) => sum + day.wins, 0);
+    const totalKills = Object.values(dailyStats).reduce((sum, day) => sum + day.kills, 0);
+    const totalDeaths = Object.values(dailyStats).reduce((sum, day) => sum + day.deaths, 0);
+    const overallWinRate = rankedMatches > 0 ? ((totalWins / rankedMatches) * 100).toFixed(1) : 0;
+    const overallKD = totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : 0;
+    let bestKdDay = { value: -1, label: 'Brak danych' }, bestWinRateDay = { value: -1, label: 'Brak danych' }, mostKillsDay = { value: -1, label: 'Brak danych' }, mostWinsDay = { value: -1, label: 'Brak danych' }, mostMatchesDay = { value: -1, label: 'Brak danych' };
+    dates.forEach(date => {
+        const day = dailyStats[date], label = dateToLabelMap[date] || date, currentKd = day.deaths > 0 ? (day.kills / day.deaths) : 0, currentWinRate = day.matches > 0 ? (day.wins / day.matches) * 100 : 0;
+        if (currentKd > bestKdDay.value) bestKdDay = { value: currentKd, label: label };
+        if (currentWinRate > bestWinRateDay.value) bestWinRateDay = { value: currentWinRate, label: label };
+        if (day.kills > mostKillsDay.value) mostKillsDay = { value: day.kills, label: label };
+        if (day.wins > mostWinsDay.value) mostWinsDay = { value: day.wins, label: label };
+        if (day.matches > mostMatchesDay.value) mostMatchesDay = { value: day.matches, label: label };
+    });
+    const totalLosses = rankedMatches - totalWins;
+    const wdlBalance = `${totalWins}W / ${totalLosses}L`;
+
+    const html = `<!DOCTYPE html><html lang="pl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>TORAD | Statystyki Valorant</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" /><script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script><style>
+    :root {
+        --torad-primary: #7c3aed;
+        --torad-secondary: #a855f7;
+        --torad-dark: #0f0f23;
+        --torad-card-bg: rgba(124, 58, 237, 0.15);
+        --text-primary: #f8fafc;
+        --text-secondary: #cbd5e1;
+        --border-color: rgba(124, 58, 237, 0.4);
+        --accent-glow: #06d6a0;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: 'Inter', sans-serif;
+        background-color: var(--torad-dark);
+        background-image: 
+            radial-gradient(circle at 20% 80%, rgba(124, 58, 237, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(168, 85, 247, 0.3) 0%, transparent 50%),
+            linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), 
+            linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+        background-size: 100% 100%, 100% 100%, 30px 30px, 30px 30px;
+        color: var(--text-primary);
+        min-height: 100vh;
+        padding: 20px;
+    }
+    .container { max-width: 1400px; margin: 0 auto; }
+    .header {
+        text-align: center; margin-bottom: 20px; padding: 40px; background: transparent;
+    }
+    .header h1 {
+        font-family: 'Anton', sans-serif;
+        font-size: 3.5rem;
+        font-weight: 400;
+        text-transform: uppercase;
+        background: linear-gradient(135deg, var(--torad-primary) 0%, var(--torad-secondary) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 12px;
+        letter-spacing: 2px;
+        text-shadow: 0 0 20px rgba(124, 58, 237, 0.5);
+    }
+    .player-info { font-size: 1.2rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; }
+    .player-info a { color: var(--torad-secondary); text-decoration: none; }
+    .player-info a:hover { color: var(--torad-primary); }
+    .section-title {
+        font-family: 'Anton', sans-serif;
+        text-align: center; font-size: 2.5rem; font-weight: 400; text-transform: uppercase; letter-spacing: 1px; margin: 60px 0 30px 0; color: var(--text-primary);
+    }
+    .summary-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 40px; }
+    .stat-card {
+        background: var(--torad-card-bg);
+        backdrop-filter: blur(10px);
+        padding: 30px;
+        text-align: center;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(124, 58, 237, 0.1), transparent);
+        transition: left 0.5s;
+    }
+    .stat-card:hover::before { left: 100%; }
+    .stat-card:hover { 
+        background: rgba(124, 58, 237, 0.25); 
+        transform: translateY(-5px); 
+        border-color: var(--torad-secondary);
+        box-shadow: 0 10px 25px rgba(124, 58, 237, 0.3);
+    }
+    .stat-value { font-size: 2.5rem; font-weight: 700; color: var(--text-primary); margin-bottom: 10px; }
+    .stat-value-highlight { color: var(--torad-secondary); }
+    .stat-label { font-size: 1rem; color: var(--text-secondary); font-weight: 500; text-transform: uppercase; }
+    .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(550px, 1fr)); gap: 25px; margin-bottom: 30px; }
+    .chart-container { 
+        background: var(--torad-card-bg); 
+        backdrop-filter: blur(15px);
+        padding: 25px; 
+        border: 1px solid var(--border-color); 
+        border-radius: 12px;
+        height: 450px; 
+    }
+    .chart-title {
+        font-family: 'Anton', sans-serif; font-size: 1.5rem; letter-spacing: 1px; margin-bottom: 20px; text-align: center; font-weight: 400; color: var(--torad-secondary);
+    }
+    .footer { text-align: center; margin-top: 60px; padding: 20px; color: var(--text-secondary); font-size: .9rem; }
+    .rank-panel {
+        display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 30px; padding: 30px; margin-top: 30px; 
+        background: var(--torad-card-bg); 
+        backdrop-filter: blur(15px);
+        border-top: 2px solid var(--torad-primary); 
+        border-bottom: 2px solid var(--torad-primary);
+        border-radius: 12px;
+    }
+    .rank-icon img { width: 120px; height: 120px; filter: drop-shadow(0 0 15px rgba(124, 58, 237, 0.6)); }
+    .rank-details { text-align: left; }
+    .rank-name { font-size: 2.2rem; font-weight: 700; text-transform: uppercase; color: var(--text-primary); }
+    .rank-rr { font-size: 1.2rem; color: var(--text-secondary); margin-top: 5px; }
+    .rr-change { font-weight: 600; }
+    .rr-change-positive { color: var(--accent-glow); }
+    .rr-change-negative { color: #ef4444; }
+    .progress-bar-wrapper { display: flex; align-items: center; gap: 10px; margin-top: 15px; }
+    .progress-bar { width: 100%; max-width: 250px; height: 4px; background-color: rgba(255, 255, 255, 0.2); overflow: hidden; border-radius: 2px; }
+    .progress-bar-inner { height: 100%; background: linear-gradient(90deg, var(--torad-primary), var(--torad-secondary)); }
+    @media (max-width: 1200px) { .charts-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 600px) { 
+        .header h1 { font-size: 2.5rem; } 
+        .summary-stats { grid-template-columns: 1fr; } 
+        .stat-value { font-size: 2rem; } 
+        .charts-grid { grid-template-columns: 1fr; } 
+        .rank-panel { flex-direction: column; text-align: center; } 
+        .rank-details { text-align: center; } 
+    }
+    </style></head><body><div class="container"><div class="header"><h1>TORAD STATS</h1><div class="player-info">TIER 2 DEMON • <a href="https://tracker.gg/valorant/profile/riot/${playerInfo.name}%23${playerInfo.tag}/overview">${playerInfo.name}#${playerInfo.tag}</a></div></div><div id="rank-panel-placeholder" class="rank-panel"><p>Ładowanie rangi...</p></div><h2 class="section-title">Statystyki Ogólne</h2><div class="summary-stats"><div class="stat-card"><div class="stat-value">${rankedMatches}</div><div class="stat-label">Łącznie rankedów</div></div><div class="stat-card"><div class="stat-value stat-value-highlight">${overallWinRate}%</div><div class="stat-label">Łączny Win Rate</div></div><div class="stat-card"><div class="stat-value stat-value-highlight">${overallKD}</div><div class="stat-label">Łączne K/D</div></div><div class="stat-card"><div class="stat-value">${totalKills}</div><div class="stat-label">Killi</div></div><div class="stat-card"><div class="stat-value">${wdlBalance}</div><div class="stat-label">Bilans W/L</div></div></div><h2 class="section-title">Najlepsze Osiągnięcia Dzienne</h2><div class="summary-stats"><div class="stat-card"><div class="stat-value">${mostMatchesDay.value}</div><div class="stat-label">Meczy (${mostMatchesDay.label})</div></div><div class="stat-card"><div class="stat-value stat-value-highlight">${bestWinRateDay.value.toFixed(1)}%</div><div class="stat-label">Win Rate (${bestWinRateDay.label})</div></div><div class="stat-card"><div class="stat-value stat-value-highlight">${bestKdDay.value.toFixed(2)}</div><div class="stat-label">K/D (${bestKdDay.label})</div></div><div class="stat-card"><div class="stat-value">${mostKillsDay.value}</div><div class="stat-label">Killi (${mostKillsDay.label})</div></div><div class="stat-card"><div class="stat-value">${mostWinsDay.value}</div><div class="stat-label">Wygranych (${mostWinsDay.label})</div></div></div><h2 class="section-title">Wykresy dzienne</h2><div class="charts-grid"><div class="chart-container"><h3 class="chart-title">Dzienny Win Rate</h3><canvas id="winrateChart" class="chart-canvas"></canvas></div><div class="chart-container"><h3 class="chart-title">Dzienne K/D Ratio</h3><canvas id="kdChart" class="chart-canvas"></canvas></div><div class="chart-container"><h3 class="chart-title">Dzienne Kille vs Śmierci</h3><canvas id="killsDeathsChart" class="chart-canvas"></canvas></div><div class="chart-container"><h3 class="chart-title">Dziennie zagranych meczy</h3><canvas id="matchesChart" class="chart-canvas"></canvas></div></div><div class="footer">Statystyki dla TORAD (${playerInfo.name}#${playerInfo.tag})<br />Wygenerowano ${new Date().toLocaleString('pl-PL')} • Dane pokrywają ${dates.length} dni</div></div><script>
+        const TIER_ICONS = ${JSON.stringify(TIER_ICONS)};
+        document.addEventListener('DOMContentLoaded', () => {
+            const placeholder = document.getElementById('rank-panel-placeholder');
+            // For TORAD, we'll use a different API endpoint or handle rank data differently
+            // You might want to modify this part based on your API setup
+            fetch('https://api.valo.lol/api/torad-rank').then(response => { 
+                if (!response.ok) { 
+                    throw new Error(\`Network response was not ok, status: \${response.status}\`); 
+                } 
+                return response.json(); 
+            }).then(data => {
+                if (data && data.current_data && data.current_data.currenttierpatched) {
+                    const currentRankData = data.current_data;
+                    const tierId = currentRankData.currenttier;
+                    const tierName = currentRankData.currenttierpatched;
+                    const rr = currentRankData.ranking_in_tier;
+                    const lastChange = currentRankData.mmr_change_to_last_game;
+                    
+                    const progress = tierName === 'Immortal 3' ? (rr / 550) * 100 : (rr / 100) * 100;
+                    
+                    const rankPanelHtml = \`<div class="rank-icon"><img src="\${TIER_ICONS[tierId] || ''}" alt="\${tierName || 'Unknown Rank'}"></div><div class="rank-details"><div class="rank-name">\${tierName || 'Brak Danych'}</div><div class="rank-rr">\${rr} RR <span class="rr-change \${lastChange >= 0 ? 'rr-change-positive' : 'rr-change-negative'}">(\${lastChange >= 0 ? '+' : ''}\${lastChange})</span></div><div class="progress-bar-wrapper"><div class="progress-bar"><div class="progress-bar-inner" style="width: \${progress}%"></div></div></div></div>\`;
+                    placeholder.innerHTML = rankPanelHtml;
+                } else { 
+                    placeholder.innerHTML = '<p>Nie udało się załadować danych o randze. API zwróciło niekompletne dane.</p>'; 
+                }
+            }).catch(error => { 
+                console.error('Error fetching rank data:', error); 
+                placeholder.innerHTML = '<p>Wystąpił błąd podczas ładowania danych o randze.</p>'; 
+            });
+        });
+        const chartLabels = ${JSON.stringify(chartLabels)}, dailyStats = ${JSON.stringify(dailyStats)}, dates = ${JSON.stringify(dates)};
+        Chart.defaults.borderColor='rgba(255,255,255,0.1)';Chart.defaults.color='#cbd5e1';
+        const chartOptions={responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#f8fafc'}}},scales:{x:{grid:{color:'rgba(255,255,255,0.1)'},ticks:{color:'#cbd5e1'}},y:{grid:{color:'rgba(255,255,255,0.1)'},ticks:{color:'#cbd5e1'},beginAtZero:true}}};
+        new Chart(document.getElementById('winrateChart'),{type:'line',data:{labels:chartLabels,datasets:[{label:'Win Rate (%)',data:dates.map(d=>dailyStats[d].matches>0?((dailyStats[d].wins/dailyStats[d].matches)*100).toFixed(1):0),borderColor:'#a855f7',backgroundColor:'rgba(168,85,247,0.1)',fill:true,tension:0.4}]},options:{...chartOptions,scales:{...chartOptions.scales,y:{...chartOptions.scales.y,min:0,max:100}}}});
+        new Chart(document.getElementById('kdChart'),{type:'line',data:{labels:chartLabels,datasets:[{label:'K/D',data:dates.map(d=>dailyStats[d].deaths>0?(dailyStats[d].kills/dailyStats[d].deaths).toFixed(2):0),borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,0.1)',fill:true,tension:0.4}]},options:chartOptions});
+        new Chart(document.getElementById('killsDeathsChart'),{type:'line',data:{labels:chartLabels,datasets:[{label:'Kille',data:dates.map(d=>dailyStats[d].kills),borderColor:'#06d6a0',fill:false,tension:0.4},{label:'Śmierci',data:dates.map(d=>dailyStats[d].deaths),borderColor:'#ef4444',fill:false,tension:0.4}]},options:chartOptions});
+        new Chart(document.getElementById('matchesChart'),{type:'bar',data:{labels:chartLabels,datasets:[{label:'Zagrane gry',data:dates.map(d=>dailyStats[d].matches),backgroundColor:'rgba(124,58,237,0.7)',borderColor:'#7c3aed',borderWidth:1}]},options:{...chartOptions,scales:{...chartOptions.scales,y:{...chartOptions.scales.y,ticks:{...chartOptions.scales.y.ticks,stepSize:1}}}}});
+    </script></body></html>`;
+    return html;
+}
+
+async function generateAndSaveToradStats() {
+    log.info('TORAD', 'Starting Torad stats generation process...');
+    try {
+        await initFetch(); 
+        
+        const matches = await fetchAllMatchesUntilDate();
+        if (matches.length === 0) {
+            fs.writeFileSync(OUTPUT_FILE_NAME, "<h1>Nie znaleziono żadnych meczy od wyznaczonej daty dla gracza TORAD.</h1>");
+            log.warn('TORAD', 'No matches found since the stop date. An informational file was created.');
+            return;
+        }
+        const playerInfo = { name: TORAD_PLAYER_NAME, tag: TORAD_PLAYER_TAG, region: TORAD_PLAYER_REGION };
+        const jsonData = { player: playerInfo, matches: matches };
+        const dailyStats = processMatchData(jsonData);
+        const htmlContent = generateHTML(dailyStats, playerInfo);
+        fs.writeFileSync(OUTPUT_FILE_NAME, htmlContent, 'utf-8');
+        log.info('TORAD', '✅ Torad static HTML file has been successfully generated and saved.');
+    } catch (error) {
+        log.error('TORAD', 'Critical error during Torad stats generation.', error);
+        fs.writeFileSync(OUTPUT_FILE_NAME, `<h1>Wystąpił krytyczny błąd podczas generowania statystyk TORAD: ${error.message}</h1>`, 'utf-8');
+    }
+}
+(async() => { await generateAndSaveToradStats(); })();
+module.exports = { generateAndSaveToradStats };

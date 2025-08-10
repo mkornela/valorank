@@ -72,6 +72,28 @@ router.get('/statystyki', (req, res) => {
     }
 });
 
+router.get('/challengetoradiant', (req, res) => {
+    const statsFilePath = path.join(process.cwd(), 'torad_valorant_stats.html');
+    if (fs.existsSync(statsFilePath)) {
+        logToDiscord({
+            title: 'API Call Success: `/challengetoradiant`',
+            color: 0x00FF00,
+            timestamp: new Date().toISOString(),
+            footer: { text: `IP: ${req.ip}` }
+        });
+        res.sendFile(statsFilePath);
+    } else {
+        logToDiscord({
+            title: 'API Call Failed: `/challengetoradiant`',
+            color: 0xFFA500,
+            description: 'Stats file not found. It may be generating.',
+            timestamp: new Date().toISOString(),
+            footer: { text: `IP: ${req.ip}` }
+        }, true);
+        res.status(503).send('Statystyki są w trakcie generowania. Proszę odświeżyć stronę za chwilę.');
+    }
+});
+
 router.get('/display', (req, res) => {
     const displayFilePath = path.join(process.cwd(), 'display.html');
     if (fs.existsSync(displayFilePath)) {
