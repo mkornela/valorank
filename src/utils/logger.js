@@ -90,7 +90,7 @@ const log = {
         console.error(formatMessage(p.red('ERROR'), module.toUpperCase(), errorMessage));
         addToBuffer('error', module, errorMessage, error);
         
-        sendToErrorEndpoint(module, message, error).catch(() => {});
+        //sendToErrorEndpoint(module, message, error).catch(() => {});
     },
 
     debug: (module, message) => {
