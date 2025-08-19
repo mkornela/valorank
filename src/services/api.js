@@ -38,7 +38,7 @@ async function fetchFromHenrikApi(urlPath, queryParams = {}) {
             } catch (e) { 
                 errorData = { message: await response.text() }; 
             } 
-            console.log(errorData)
+            //console.log(errorData)
             throw new Error(`HenrikDev API error! Status: ${response.status}. Message: ${errorData.message || 'Unknown error'}`); 
         }
         
