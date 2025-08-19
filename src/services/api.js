@@ -151,7 +151,7 @@ async function fetchLeaderboard(region) {
 
 async function checkApiStatus(region = 'eu') {
     try {
-        const data = await fetchFromHenrikApi(`/valorant/v1/status/${region}`);
+        const data = await fetchFromHenrikApi(`/valorant/v1/version/${region}`);
         return { reachable: true, data: data };
     } catch (error) {
         log.warn('API_CHECK', `Ping do HenrikDev API nie powiódł się: ${error.message}`);
