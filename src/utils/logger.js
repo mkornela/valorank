@@ -38,7 +38,7 @@ const addToBuffer = (level, module, message, error = null) => {
     return logEntry;
 };
 
-const sendToErrorEndpoint = async (module, message, error = null) => {
+/*const sendToErrorEndpoint = async (module, message, error = null) => {
     try {
         const endpoint = 'https://n8n.valo.lol/webhook/valorank-error';
         const timestamp = dayjs().format('DD/MM/YYYY HH:mm:ss');
@@ -69,7 +69,7 @@ const sendToErrorEndpoint = async (module, message, error = null) => {
     } catch (endpointError) {
         console.error('Error endpoint failure:', endpointError.message);
     }
-};
+};*/
 
 const log = {
     info: (module, message) => {
