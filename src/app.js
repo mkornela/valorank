@@ -82,7 +82,11 @@ app.use((err, req, res, next) => {
         footer: { text: `IP: ${req.ip}` }
     }, true);
     if (res.headersSent) return next(err);
-    res.status(500).json({ error: 'Wystąpił wewnętrzny błąd serwera.', details: err });
+    res.status(500).json({ error: 'Wystąpił wewnętrzny błąd serwera.', details: {
+        message: err.message,
+        originalURL: req.originalUrl,
+        requestMethod: req.method
+    } });
 });
 
 module.exports = app;
