@@ -131,12 +131,12 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
             goal = `${goalRank} (już osiągnięte!)`;
             rrToGoal = 0;
         }
-    }/* else {
-        const originalGoal = calculateRRToGoal(currenttier, ranking_in_tier || 0, leaderboard.data?.players);
+    } else {
+        const originalGoal = calculateRRToGoal(currenttier, ranking_in_tier || 0);
         rr = originalGoal.rr;
         goal = originalGoal.goal;
         rrToGoal = rr;
-    }*/
+    }
 
     const { startTime, endTime } = getSessionTimeRange(null, resetTime);
     const mmrHistoryArray = mmrHistory?.data?.history || [];

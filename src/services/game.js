@@ -1,19 +1,13 @@
 const { RANK_TIERS, RADIANT_BASE_THRESHOLD } = require('../constants');
 const { getLeaderboardData } = require('../data/leaderboard'); 
 
-function calculateRRToGoal(currentTier, currentRR, liveLeaderboardPlayers = null) {
+function calculateRRToGoal(currentTier, currentRR) {
     if (currentTier === 27) { 
         return { rr: 0, goal: "Radiant!" }; 
     }
     
     if (currentTier >= 26) { 
-        let radiantRequiredRR = RADIANT_BASE_THRESHOLD;
-        const players = liveLeaderboardPlayers || getLeaderboardData().data?.players;
-        if (players && players.length >= 500) {
-            const top500cutoff = (players[499]?.rankedRating || 0) + 1;
-            radiantRequiredRR = Math.max(RADIANT_BASE_THRESHOLD, top500cutoff);
-        }
-        const totalRRneeded = Math.max(0, radiantRequiredRR - currentRR);
+        const totalRRneeded = RADIANT_BASE_THRESHOLD;
         return { rr: totalRRneeded, goal: "Radiant" };
     }
     
