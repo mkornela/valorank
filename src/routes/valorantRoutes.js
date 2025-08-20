@@ -85,13 +85,19 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
     }
 
-    const [mmr, leaderboard, account, rawHistory, mmrHistory] = await Promise.all([
+    const [mmr, /*leaderboard,*/ account, rawHistory, mmrHistory] = await Promise.all([
         fetchPlayerMMR(name, tag, region),
-        fetchLeaderboard(region),
+        //fetchLeaderboard(region),
         fetchAccountDetails(name, tag),
         fetchMatchHistory(name, tag, region, 'competitive', 25),
         fetchMMRHistoryDaily(name, tag, region)
     ]);
+    console.log({
+        mmr,
+        account,
+        rawHistory,
+        mmrHistory
+    })
 
     let lastStatsRaw;
     rawHistory.data[0].players.forEach(player => {
@@ -125,12 +131,12 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
             goal = `${goalRank} (już osiągnięte!)`;
             rrToGoal = 0;
         }
-    } else {
+    }/* else {
         const originalGoal = calculateRRToGoal(currenttier, ranking_in_tier || 0, leaderboard.data?.players);
         rr = originalGoal.rr;
         goal = originalGoal.goal;
         rrToGoal = rr;
-    }
+    }*/
 
     const { startTime, endTime } = getSessionTimeRange(null, resetTime);
     const mmrHistoryArray = mmrHistory?.data?.history || [];
