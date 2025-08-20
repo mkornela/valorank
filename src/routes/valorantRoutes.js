@@ -150,12 +150,12 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     const lastStats = `${lastStatsRaw.stats.kills}/${lastStatsRaw.stats.deaths}/${lastStatsRaw.stats.assists}`;
     const lastAgent = lastStatsRaw.agent.name;
 
-    let playerLB = await findPlayer(leaderboard.data.players, name, tag);
-    if(playerLB != 'Not found') {
-        playerLB = `#${playerLB.leaderboard_rank}`;
-    } else {
+    //let playerLB = await findPlayer(leaderboard.data.players, name, tag);
+    //if(playerLB != 'Not found') {
+    //    playerLB = `#${playerLB.leaderboard_rank}`;
+    //} else {
         playerLB = ``;
-    }
+    //}
     
     let finalText = text
         .replace(/{name}/g, name)
