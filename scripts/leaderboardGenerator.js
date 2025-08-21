@@ -3,7 +3,7 @@ const fs = require('fs');
 const https = require('https');
 
 const API_KEY = '';
-const ACT_ID = 'aef237a0-494d-3a14-a1c8-ec8de84e309c';
+const ACT_ID = 'ac12e9b3-47e6-9599-8fa1-0bb473e5efc7';
 const BASE_URL = 'eu.api.riotgames.com';
 const SIZE_PER_REQUEST = 200;
 const TARGET_PLAYERS = 15000;
