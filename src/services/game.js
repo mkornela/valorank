@@ -8,31 +8,18 @@ const log = require('../utils/logger');
  * @returns {Object} Object containing RR needed and goal rank
  */
 function calculateRRToGoal(currentTier, currentRR) {
-    // Handle unranked players
-    if (currentTier === 0) {
-        return {
-            rr: 100, // RR needed for Iron 1
-            goal: 'Iron 1'
-        };
+    if (currentTier === 27) { 
+        return { rr: 0, goal: "Radiant!" }; 
     }
-
-    // Handle Radiant players
-    if (currentTier === 27) {
-        return {
-            rr: 0,
-            goal: 'Radiant (Max!)'
-        };
+    
+    if (currentTier >= 26) { 
+        const totalRRneeded = RADIANT_BASE_THRESHOLD;
+        return { rr: totalRRneeded, goal: "Radiant" };
     }
-
-    // Calculate RR needed for next tier
-    const nextTier = currentTier + 1;
-    const rrNeeded = 100 - currentRR;
-    const goalRank = RANK_TIERS[nextTier];
-
-    return {
-        rr: Math.max(0, rrNeeded),
-        goal: goalRank
-    };
+    
+    const rrToNext = Math.max(0, 100 - currentRR);
+    const nextGoalRank = RANK_TIERS[currentTier + 1] || "Następna ranga";
+    return { rr: rrToNext, goal: nextGoalRank };
 }
 
 /**
@@ -44,182 +31,71 @@ function calculateRRToGoal(currentTier, currentRR) {
  * @param {Date} endTime - Session end time
  * @returns {Object} Session statistics
  */
-function calculateSessionStats(matchHistory, mmrHistory, playerPUUID, startTime, endTime) {
-    let wins = 0;
-    let losses = 0;
-    let draws = 0;
-    let lastMatchRR = null;
-    let totalRRChange = 0;
-    let lastMatchResult = null;
-    let lastMatchTime = null;
+function calculateSessionStats(matchHistoryData, mmrHistoryArray, playerPuuid, sessionStartTime, sessionEndTime) {
+   let wins = 0, losses = 0, draws = 0, totalRRChange = 0, latestMap = null, lastMatchResult = null, lastMatchRR = null;
+   
+   if (Array.isArray(mmrHistoryArray)) {
+       let isFirstRRMatchInSession = true;
+       for (const entry of mmrHistoryArray) {
+           let entryDate, rrChange;
 
-    // Process match history
-    if (matchHistory && matchHistory.data && Array.isArray(matchHistory.data)) {
-        let debugCount = 0;
-        for (const match of matchHistory.data) {
-            // Log structure of first few matches for debugging
-            if (debugCount < 3) {
-                log.debug('SESSION_STATS', `Match ${debugCount + 1} structure:`, {
-                    matchId: match.metadata?.matchid,
-                    hasTeams: !!match.teams,
-                    teamsType: Array.isArray(match.teams) ? 'array' : typeof match.teams,
-                    hasRounds: !!match.rounds,
-                    roundsType: Array.isArray(match.rounds) ? 'array' : typeof match.rounds,
-                    playersType: Array.isArray(match.players) ? 'array' : typeof match.players,
-                    all_playersType: Array.isArray(match.players?.all_players) ? 'array' : typeof match.players?.all_players
-                });
-                debugCount++;
-            }
-            
-            const matchTime = new Date(match.metadata?.game_start_iso || match.meta?.start_time);
-            
-            // Skip matches outside session time range
-            if (matchTime < startTime || matchTime > endTime) {
-                continue;
-            }
+           if (entry.date) {
+               entryDate = new Date(entry.date);
+               rrChange = entry.last_change;
+           } else if (entry.date_raw) {
+               entryDate = new Date(entry.date_raw * 1000);
+               rrChange = entry.mmr_change_to_last_game;
+           } else {
+               continue;
+           }
 
-            // Find player in the match
-            const player = match.players?.all_players?.find(p => p.puuid === playerPUUID) ||
-                         match.players?.find(p => p.puuid === playerPUUID);
+           if (!isNaN(entryDate.getTime()) && entryDate >= sessionStartTime && entryDate < sessionEndTime) {
+               if (typeof rrChange === 'number') {
+                   totalRRChange += rrChange;
+                   if (isFirstRRMatchInSession) {
+                       lastMatchRR = rrChange;
+                       isFirstRRMatchInSession = false;
+                   }
+               }
+           }
+       }
+   }
+   
+   if (matchHistoryData && Array.isArray(matchHistoryData.data) && matchHistoryData.data.length > 0) {
+       let isFirstMatch = true;
+       for (const match of matchHistoryData.data) {
+           let matchStartTime = null;
+           try { matchStartTime = new Date(match.metadata.started_at); } catch (e) { continue; }
+           
+           if (!matchStartTime || isNaN(matchStartTime.getTime()) || matchStartTime < sessionStartTime || matchStartTime >= sessionEndTime) continue;
+           if (!match.players.some(p => p.puuid === playerPuuid)) continue;
+           
+           if (isFirstMatch) {
+               if (match.metadata.map?.name) latestMap = match.metadata.map.name;
+           }
+           
+           const playerInMatch = match.players.find(p => p.puuid === playerPuuid);
+           const playerTeam = match.teams.find(team => team.team_id === playerInMatch.team_id);
+           const enemyTeam = match.teams.find(team => team.team_id !== playerInMatch.team_id);
 
-            if (!player) {
-                log.debug('SESSION_STATS', `Player ${playerPUUID} not found in match ${match.metadata?.matchid}`);
-                continue;
-            }
+           if (playerTeam && enemyTeam) {
+               const isDraw = playerTeam.won === false && enemyTeam.won === false;
+               if (isDraw) {
+                   draws++;
+                   if(isFirstMatch) lastMatchResult = 'D';
+               } else if (playerTeam.won === true) {
+                   wins++;
+                   if(isFirstMatch) lastMatchResult = 'W';
+               } else {
+                   losses++;
+                   if(isFirstMatch) lastMatchResult = 'L';
+               }
+               if(isFirstMatch) isFirstMatch = false;
+           }
+       }
+   }
 
-            // Initialize match debug info for this match
-            const matchDebugInfo = {
-                matchId: match.metadata?.matchid,
-                hasTeams: !!match.teams,
-                teamsType: Array.isArray(match.teams) ? 'array' : typeof match.teams,
-                hasRounds: !!match.rounds,
-                roundsType: Array.isArray(match.rounds) ? 'array' : typeof match.rounds,
-                hasPlayers: !!match.players,
-                playersType: Array.isArray(match.players) ? 'array' : typeof match.players,
-                playerTeamId: player?.team_id,
-                playerFound: !!player
-            };
-
-            // Determine match result - handle different possible data structures
-            let hasWon = undefined;
-            
-            // Try different possible structures for match result
-            if (match.teams && Array.isArray(match.teams)) {
-                const team = match.teams.find(t => t.team_id === player.team_id);
-                hasWon = team?.has_won;
-                log.debug('SESSION_STATS', `Team structure found for match ${match.metadata?.matchid}:`, {
-                    playerTeamId: player.team_id,
-                    foundTeam: !!team,
-                    hasWon: hasWon
-                });
-            } else if (match.rounds && Array.isArray(match.rounds)) {
-                // Some API responses use rounds structure
-                const playerTeamRounds = match.rounds.filter(round => 
-                    round.teams && round.teams.find(t => t.team_id === player.team_id)
-                );
-                const wonRounds = playerTeamRounds.filter(round => {
-                    const team = round.teams.find(t => t.team_id === player.team_id);
-                    return team && team.won;
-                });
-                hasWon = wonRounds.length > playerTeamRounds.length / 2;
-                log.debug('SESSION_STATS', `Rounds structure found for match ${match.metadata?.matchid}:`, {
-                    totalRounds: playerTeamRounds.length,
-                    wonRounds: wonRounds.length,
-                    hasWon: hasWon
-                });
-            }
-            
-            // Additional check: look for blue/red team structure (common in Valorant APIs)
-            if (hasWon === undefined && match.teams) {
-                const blueTeam = match.teams.find(t => t.team_id === 'Blue' || t.team_id === 'blue');
-                const redTeam = match.teams.find(t => t.team_id === 'Red' || t.team_id === 'red');
-                
-                if (blueTeam && redTeam) {
-                    // Check if player is on blue team
-                    if (player.team_id === 'Blue' || player.team_id === 'blue') {
-                        hasWon = blueTeam.has_won;
-                        matchDebugInfo.blueRedTeam = 'blue';
-                        matchDebugInfo.method = 'blue_red';
-                    } else if (player.team_id === 'Red' || player.team_id === 'red') {
-                        hasWon = redTeam.has_won;
-                        matchDebugInfo.blueRedTeam = 'red';
-                        matchDebugInfo.method = 'blue_red';
-                    }
-                }
-            }
-            
-            if (hasWon === true) {
-                wins++;
-                lastMatchResult = 'win';
-            } else if (hasWon === false) {
-                losses++;
-                lastMatchResult = 'loss';
-            } else {
-                // Check for actual draw conditions (very rare in Valorant)
-                if (match.teams && Array.isArray(match.teams) && match.teams.length >= 2) {
-                    const team1 = match.teams[0];
-                    const team2 = match.teams[1];
-                    if (team1.rounds_won !== undefined && team2.rounds_won !== undefined) {
-                        if (team1.rounds_won === team2.rounds_won) {
-                            // This is a legitimate draw/tie
-                            draws++;
-                            lastMatchResult = 'draw';
-                            log.debug('SESSION_STATS', `Legitimate draw detected in match ${match.metadata?.matchid}`);
-                        } else {
-                            // Can't determine result, skip this match
-                            log.debug('SESSION_STATS', `Could not determine match result for ${playerPUUID} in match ${match.metadata?.matchid} - no clear win/loss data`, matchDebugInfo);
-                            continue;
-                        }
-                    } else {
-                        // Can't determine result, skip this match
-                        log.debug('SESSION_STATS', `Could not determine match result for ${playerPUUID} in match ${match.metadata?.matchid} - no score data`, matchDebugInfo);
-                        continue;
-                    }
-                } else {
-                    // Can't determine result, skip this match
-                    log.debug('SESSION_STATS', `Could not determine match result for ${playerPUUID} in match ${match.metadata?.matchid} - no teams data`, matchDebugInfo);
-                    continue;
-                }
-            }
-
-            lastMatchTime = matchTime;
-        }
-    }
-
-    // Process MMR history for RR changes
-    if (mmrHistory && Array.isArray(mmrHistory)) {
-        const sessionMMR = mmrHistory.filter(entry => {
-            const entryTime = new Date(entry.date || entry.timestamp);
-            return entryTime >= startTime && entryTime <= endTime;
-        });
-
-        if (sessionMMR.length >= 2) {
-            const firstMMR = sessionMMR[0];
-            const lastMMR = sessionMMR[sessionMMR.length - 1];
-            
-            totalRRChange = (lastMMR.ranking_in_tier || 0) - (firstMMR.ranking_in_tier || 0);
-            
-            // Calculate last match RR change
-            if (sessionMMR.length > 1) {
-                const secondLastMMR = sessionMMR[sessionMMR.length - 2];
-                lastMatchRR = (lastMMR.ranking_in_tier || 0) - (secondLastMMR.ranking_in_tier || 0);
-            }
-        } else if (sessionMMR.length === 1) {
-            // Only one MMR entry in session
-            totalRRChange = 0;
-            lastMatchRR = null;
-        }
-    }
-
-    return {
-        wins,
-        losses,
-        draws,
-        lastMatchRR,
-        totalRRChange,
-        lastMatchResult,
-        lastMatchTime
-    };
+   return { wins, losses, draws, totalRRChange, latestMap, lastMatchResult, lastMatchRR };
 }
 
 /**
