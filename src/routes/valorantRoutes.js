@@ -20,9 +20,6 @@ const { findPlayerByRank } = require('../data/leaderboard');
 const { calculateRRToGoal, calculateSessionStats } = require('../services/game');
 const log = require('../utils/logger');
 
-const { VlrClient } = require('vlr-client');
-const vlr = new VlrClient();
-
 /**
  * Async handler wrapper for consistent error handling
  */
