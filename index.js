@@ -1,54 +1,40 @@
-require('dotenv').config();
-
-const cron = require('node-cron');
 const app = require('./src/app');
 const config = require('./src/config');
 const log = require('./src/utils/logger');
-const { logToDiscord } = require('./src/utils/discord');
-const { generateAndSaveStats } = require('./scripts/statsGenerator');
-const { initFetch } = require('./src/services/api');
 
-async function startServer() {
-    try {
-        config.validateConfig();
-        await initFetch();
+// Start the server
+const server = app.listen(config.PORT, () => {
+  log.info('SERVER', `Valorank Enhanced server running on port ${config.PORT}`);
+  log.info('SERVER', `Environment: ${config.NODE_ENV}`);
+  log.info('SERVER', `Health check available at: http://localhost:${config.PORT}/health`);
+  log.info('SERVER', `API documentation available at: http://localhost:${config.PORT}/api-docs`);
+});
 
-        app.listen(config.PORT, () => {
-            log.info('SERVER', `VALORANT Stats API running on http://localhost:${config.PORT}`);
-            if (config.DISCORD_WEBHOOK_URL) {
-                log.info('SERVER', 'Discord logging is enabled.');
-                logToDiscord({ 
-                    title: 'Server Started', 
-                    color: 0x00FF00, 
-                    description: `Server is online on port ${config.PORT}.`, 
-                    timestamp: new Date().toISOString() 
-                });
-            }
+// Handle server errors
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    log.error('SERVER', `Port ${config.PORT} is already in use`);
+    process.exit(1);
+  } else {
+    log.error('SERVER', 'Server error', error);
+  }
+});
 
-            //log.info('SERVER', 'Running initial stats generation on startup...');
-            //generateAndSaveStats().catch(err => {
-            //     log.error('SERVER', 'Initial stats generation failed.', err);
-            //     logToDiscord({ title: 'Critical Error: Initial Stats Generation', color: 0xFF0000, description: `\`\`\`${err.message}\`\`\``, timestamp: new Date().toISOString() }, true);
-            //});
-            
-            //cron.schedule('15 8 * * *', () => {
-            //    log.info('CRON', 'Running scheduled daily stats generation...');
-            //    logToDiscord({ title: 'Process: Scheduled Stats Generation', color: 0x00FFFF, description: 'Starting daily stats refresh.', timestamp: new Date().toISOString() });
-            //    generateAndSaveStats().catch(err => {
-            //        log.error('CRON', 'Scheduled stats generation failed.', err);
-            //        logToDiscord({ title: 'Error: Scheduled Stats Generation', color: 0xFF0000, description: `\`\`\`${err.message}\`\`\``, timestamp: new Date().toISOString() }, true);
-            //    });
-            //}, {
-            //    scheduled: true,
-            //    timezone: "Europe/Warsaw"
-            //});
-            //log.info('CRON', 'Scheduled daily stats generation for 08:15 (Europe/Warsaw).');
-        });
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  log.info('SHUTDOWN', 'SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    log.info('SHUTDOWN', 'Server closed');
+    process.exit(0);
+  });
+});
 
-    } catch (error) {
-        log.error("SERVER", "FATAL: Failed to start server.", error);
-        process.exit(1);
-    }
-}
+process.on('SIGINT', () => {
+  log.info('SHUTDOWN', 'SIGINT received, shutting down gracefully');
+  server.close(() => {
+    log.info('SHUTDOWN', 'Server closed');
+    process.exit(0);
+  });
+});
 
-startServer();
+module.exports = server;

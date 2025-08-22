@@ -1,3 +1,6 @@
+/**
+ * Valorant rank tiers mapping
+ */
 const RANK_TIERS = {
     0: "Unranked", 
     3: "Iron 1", 4: "Iron 2", 5: "Iron 3",
@@ -11,11 +14,24 @@ const RANK_TIERS = {
     27: "Radiant"
 };
 
+/**
+ * Valid regions for Valorant API
+ */
 const VALID_REGIONS = ['na', 'eu', 'ap', 'kr', 'latam', 'br'];
 
+/**
+ * Base threshold for Radiant rank
+ */
 const RADIANT_BASE_THRESHOLD = 550;
+
+/**
+ * Maximum matches per API request
+ */
 const MAX_MATCHES_PER_REQUEST = 10;
 
+/**
+ * Team abbreviations mapping
+ */
 const TEAMS = {
     'BBL Esports': 'BBL',
     'FNATIC': 'FNC',
@@ -29,13 +45,19 @@ const TEAMS = {
     'Team Vitality': 'Vitality',
     'Gentle Mates': 'M8',
     'Apeks': 'APEKS'
-}
+};
 
+/**
+ * Event names mapping
+ */
 const EVENTS = {
     'VCT 2025: EMEA Stage 2': 'VCT EMEA Stage 2',
     'VCT 2025: Americas Stage 2': 'VCT Americas Stage 2'
-}
+};
 
+/**
+ * Rank ELO thresholds for progression calculation
+ */
 const RANK_ELO_THRESHOLDS = {
     'Iron 1': 0,
     'Iron 2': 100,
@@ -64,6 +86,90 @@ const RANK_ELO_THRESHOLDS = {
     'Radiant': 2650
 };
 
+/**
+ * Game modes supported by the API
+ */
+const GAME_MODES = {
+    COMPETITIVE: 'competitive',
+    UNRATED: 'unrated',
+    SPIKE_RUSH: 'spikerush',
+    DEATHMATCH: 'deathmatch',
+    ESCALATION: 'escalation',
+    REPLICATION: 'replication',
+    CUSTOM: 'custom'
+};
+
+/**
+ * Platform types
+ */
+const PLATFORMS = {
+    PC: 'pc',
+    CONSOLE: 'console'
+};
+
+/**
+ * API response status codes
+ */
+const API_STATUS = {
+    SUCCESS: 200,
+    CREATED: 201,
+    BAD_REQUEST: 400,
+    UNAUTHORIZED: 401,
+    FORBIDDEN: 403,
+    NOT_FOUND: 404,
+    RATE_LIMITED: 429,
+    INTERNAL_ERROR: 500,
+    SERVICE_UNAVAILABLE: 503
+};
+
+/**
+ * Error messages
+ */
+const ERROR_MESSAGES = {
+    INVALID_PLAYER_NAME: 'Player name must be between 3 and 16 characters and contain only letters, numbers, and underscores',
+    INVALID_PLAYER_TAG: 'Player tag must be between 3 and 5 characters and contain only letters and numbers',
+    INVALID_REGION: 'Invalid region. Valid regions: na, eu, ap, kr, latam, br',
+    PLAYER_NOT_FOUND: 'Player not found',
+    NO_RANKING_DATA: 'No ranking data available for this player',
+    API_TIMEOUT: 'API request timeout',
+    RATE_LIMIT_EXCEEDED: 'Rate limit exceeded. Please try again later',
+    INVALID_RANK_NAME: 'Invalid rank name',
+    INVALID_MATCH_ID: 'Invalid match ID',
+    INVALID_SESSION_TIME: 'Invalid session time parameters'
+};
+
+/**
+ * Time constants (in milliseconds)
+ */
+const TIME_CONSTANTS = {
+    MINUTE: 60 * 1000,
+    HOUR: 60 * 60 * 1000,
+    DAY: 24 * 60 * 60 * 1000,
+    WEEK: 7 * 24 * 60 * 60 * 1000
+};
+
+/**
+ * Cache keys prefixes
+ */
+const CACHE_KEYS = {
+    PLAYER_MMR: 'player_mmr',
+    PLAYER_ACCOUNT: 'player_account',
+    MATCH_HISTORY: 'match_history',
+    MMR_HISTORY: 'mmr_history',
+    LEADERBOARD: 'leaderboard'
+};
+
+/**
+ * Validation patterns
+ */
+const VALIDATION_PATTERNS = {
+    PLAYER_NAME: /^[\p{L}\p{N}_\-\s\.]{3,16}$/u,
+    PLAYER_TAG: /^[a-zA-Z0-9]{3,5}$/,
+    REGION: /^(na|eu|ap|kr|latam|br)$/i,
+    RANK_NAME: /^(Iron|Bronze|Silver|Gold|Platinum|Diamond|Ascendant|Immortal|Radiant)(\s[1-3])?$/i,
+    MATCH_ID: /^[a-f0-9\-]{36}$/i
+};
+
 module.exports = {
     RANK_TIERS,
     VALID_REGIONS,
@@ -71,5 +177,12 @@ module.exports = {
     MAX_MATCHES_PER_REQUEST,
     TEAMS,
     EVENTS,
-    RANK_ELO_THRESHOLDS
+    RANK_ELO_THRESHOLDS,
+    GAME_MODES,
+    PLATFORMS,
+    API_STATUS,
+    ERROR_MESSAGES,
+    TIME_CONSTANTS,
+    CACHE_KEYS,
+    VALIDATION_PATTERNS
 };

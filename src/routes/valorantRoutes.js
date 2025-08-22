@@ -1,9 +1,21 @@
 const express = require('express');
 const router = express.Router();
+const { body, param, query } = require('express-validator');
 const { VALID_REGIONS, RANK_TIERS, TEAMS, EVENTS, RANK_ELO_THRESHOLDS } = require('../constants');
 const { logToDiscord } = require('../utils/discord');
 const { getSessionTimeRange, formatMatchDateTimeShort, getTimeUntilMatch, formatMatchDateTimeShortHour } = require('../utils/time');
-const { fetchAccountDetails, fetchMatchHistory, fetchPlayerMMR, fetchLeaderboard, fetchMMRHistory, fetchMMRHistoryDaily } = require('../services/api');
+const { 
+  fetchAccountDetails, 
+  fetchMatchHistory, 
+  fetchPlayerMMR, 
+  fetchLeaderboard, 
+  fetchMMRHistory, 
+  fetchMMRHistoryDaily,
+  validatePlayerInput,
+  APIError,
+  getCacheStats,
+  clearCache
+} = require('../services/api');
 const { findPlayerByRank } = require('../data/leaderboard');
 const { calculateRRToGoal, calculateSessionStats } = require('../services/game');
 const log = require('../utils/logger');
@@ -11,131 +23,225 @@ const log = require('../utils/logger');
 const { VlrClient } = require('vlr-client');
 const vlr = new VlrClient();
 
+/**
+ * Async handler wrapper for consistent error handling
+ */
 const asyncHandler = fn => (req, res, next) => {
-    return Promise
-        .resolve(fn(req, res, next))
-        .catch(next);
+  return Promise
+    .resolve(fn(req, res, next))
+    .catch(next);
 };
 
+/**
+ * Standard API response formatter
+ */
+const standardResponse = (data, message = 'Success', status = 200) => {
+  return {
+    success: status < 400,
+    message,
+    data,
+    timestamp: new Date().toISOString(),
+    version: 'v1'
+  };
+};
+
+/**
+ * Calculate ELO to custom goal rank
+ */
 const calculateEloToCustomGoal = (currentElo, goalRank) => {
-    const goalElo = RANK_ELO_THRESHOLDS[goalRank];
-    if (goalElo === undefined) {
-        return null; // Nieprawidłowa nazwa rangi
-    }
-    
-    const eloNeeded = goalElo - currentElo;
-    return {
-        eloNeeded: Math.max(0, eloNeeded), // Nie może być ujemne
-        goalElo: goalElo,
-        alreadyReached: eloNeeded <= 0
-    };
+  const goalElo = RANK_ELO_THRESHOLDS[goalRank];
+  if (goalElo === undefined) {
+    return null; // Invalid rank name
+  }
+  
+  const eloNeeded = goalElo - currentElo;
+  return {
+    eloNeeded: Math.max(0, eloNeeded), // Cannot be negative
+    goalElo: goalElo,
+    alreadyReached: eloNeeded <= 0
+  };
 };
 
+/**
+ * Deduplicate matches by match ID
+ */
 const deduplicateMatches = (matchHistory) => {
-    if (!matchHistory || !matchHistory.data || !Array.isArray(matchHistory.data)) {
-        return matchHistory;
+  if (!matchHistory || !matchHistory.data || !Array.isArray(matchHistory.data)) {
+    return matchHistory;
+  }
+  
+  const seen = new Set();
+  const uniqueMatches = matchHistory.data.filter(match => {
+    const matchId = match.meta?.matchid;
+    if (!matchId) return true;
+    
+    if (seen.has(matchId)) {
+      return false;
     }
-    
-    const seen = new Set();
-    const uniqueMatches = matchHistory.data.filter(match => {
-        const matchId = match.meta?.matchid;
-        if (!matchId) return true;
-        
-        if (seen.has(matchId)) {
-            return false;
-        }
-        seen.add(matchId);
-        return true;
-    });
-    
-    if (uniqueMatches.length < matchHistory.data.length) {
-        const duplicateCount = matchHistory.data.length - uniqueMatches.length;
-        log.info('DEDUP', `Removed ${duplicateCount} duplicate matches from API response`);
-    }
-    
-    return {
-        ...matchHistory,
-        data: uniqueMatches
-    };
+    seen.add(matchId);
+    return true;
+  });
+  
+  if (uniqueMatches.length < matchHistory.data.length) {
+    const duplicateCount = matchHistory.data.length - uniqueMatches.length;
+    log.info('DEDUP', `Removed ${duplicateCount} duplicate matches from API response`);
+  }
+  
+  return {
+    ...matchHistory,
+    data: uniqueMatches
+  };
 };
 
-router.get('/api/rank', asyncHandler(async (req, res, next) => {
-    const { STATS_PLAYER_NAME, STATS_PLAYER_TAG, STATS_PLAYER_REGION } = require('../config');
-    
-    const mmrData = await fetchPlayerMMR(STATS_PLAYER_NAME, STATS_PLAYER_TAG, STATS_PLAYER_REGION);
-    
-    if (mmrData && mmrData.data) {
-        res.json(mmrData.data);
-    } else {
-        res.status(404).json({ error: 'Nie znaleziono danych MMR.' });
-    }
-}));
-
+/**
+ * Find player in leaderboard
+ */
 function findPlayer(leaderboard, name, tag) {
-    let player = leaderboard.find(player => player.name === name && player.tag === tag);
-    if(!player) return 'Not found';
-    return player;
+  let player = leaderboard.find(player => player.name === name && player.tag === tag);
+  if (!player) return 'Not found';
+  return player;
 }
 
-router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
-    const { name, tag, region } = req.params;
-    const { text = "{rank} {rr}RR | Daily: {wl} ({dailyRR}RR) | Last: {lastRR}RR", resetTime, goalRank } = req.query;
-
-    if (!VALID_REGIONS.includes(region.toLowerCase())) {
-        return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
+/**
+ * @swagger
+ * /api/rank:
+ *   get:
+ *     summary: Get configured player's rank information
+ *     tags: [Rank]
+ *     responses:
+ *       200:
+ *         description: Player rank information
+ *       404:
+ *         description: Player not found
+ */
+router.get('/api/rank', [
+  query('format').optional().isIn(['json', 'text']).withMessage('Format must be json or text')
+], asyncHandler(async (req, res, next) => {
+  const { STATS_PLAYER_NAME, STATS_PLAYER_TAG, STATS_PLAYER_REGION } = require('../config');
+  const { format = 'json' } = req.query;
+  
+  const mmrData = await fetchPlayerMMR(STATS_PLAYER_NAME, STATS_PLAYER_TAG, STATS_PLAYER_REGION);
+  
+  if (mmrData && mmrData.data) {
+    if (format === 'text') {
+      const { currenttier, ranking_in_tier } = mmrData.data.current_data;
+      const rankName = RANK_TIERS[currenttier] || "Unknown";
+      const rr = ranking_in_tier || 0;
+      res.type('text/plain').send(`${rankName} ${rr}RR`);
+    } else {
+      res.json(standardResponse(mmrData.data));
     }
+  } else {
+    res.status(404).json(standardResponse(null, 'Player MMR data not found', 404));
+  }
+}));
 
-    const [mmr, /*leaderboard,*/ account, rawHistory, mmrHistory] = await Promise.all([
-        fetchPlayerMMR(name, tag, region),
-        //fetchLeaderboard(region),
-        fetchAccountDetails(name, tag),
-        fetchMatchHistory(name, tag, region, 'competitive', 25),
-        fetchMMRHistoryDaily(name, tag, region)
+/**
+ * @swagger
+ * /rank/{name}/{tag}/{region}:
+ *   get:
+ *     summary: Get player rank with customizable text format
+ *     tags: [Rank]
+ *     parameters:
+ *       - in: path
+ *         name: name
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Player name
+ *       - in: path
+ *         name: tag
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Player tag
+ *       - in: path
+ *         name: region
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [na, eu, ap, kr, latam, br]
+ *         description: Player region
+ *       - in: query
+ *         name: text
+ *         schema:
+ *           type: string
+ *         description: Custom text format template
+ *       - in: query
+ *         name: goalRank
+ *         schema:
+ *           type: string
+ *         description: Target rank for RR calculation
+ *     responses:
+ *       200:
+ *         description: Formatted player rank information
+ *       400:
+ *         description: Invalid parameters
+ *       404:
+ *         description: Player not found
+ */
+router.get('/rank/:name/:tag/:region', [
+  param('name').trim().isLength({ min: 3, max: 16 }).withMessage('Name must be 3-16 characters'),
+  param('tag').trim().isLength({ min: 3, max: 5 }).withMessage('Tag must be 3-5 characters'),
+  param('region').isIn(VALID_REGIONS).withMessage('Invalid region'),
+  query('text').optional().isString().withMessage('Text format must be a string'),
+  query('goalRank').optional().isString().withMessage('Goal rank must be a string')
+], asyncHandler(async (req, res, next) => {
+  const { name, tag, region } = req.params;
+  const { text = "{rank} {rr}RR | Daily: {wl} ({dailyRR}RR) | Last: {lastRR}RR", resetTime, goalRank } = req.query;
+
+  // Validate input
+  const validationError = validatePlayerInput(name, tag, region);
+  if (validationError) {
+    return res.status(400).type('text/plain').send(`Error: ${validationError}`);
+  }
+
+  try {
+    const [mmr, account, rawHistory, mmrHistory] = await Promise.all([
+      fetchPlayerMMR(name, tag, region),
+      fetchAccountDetails(name, tag),
+      fetchMatchHistory(name, tag, region, 'competitive', 25),
+      fetchMMRHistoryDaily(name, tag, region)
     ]);
-    console.log({
-        mmr,
-        account,
-        rawHistory,
-        mmrHistory
-    })
 
     let lastStatsRaw;
-    rawHistory.data[0].players.forEach(player => {
-        if(player.name == name) lastStatsRaw = player;
-    })
+    if (rawHistory.data && rawHistory.data[0] && rawHistory.data[0].players) {
+      rawHistory.data[0].players.forEach(player => {
+        if (player.name == name) lastStatsRaw = player;
+      });
+    }
 
     if (!mmr.data || !mmr.data.current_data) {
-        return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza lub brak danych rankingowych.');
+      return res.status(404).type('text/plain').send('Error: Player not found or no ranking data available.');
     }
     if (!account.data?.puuid) {
-        return res.status(404).type('text/plain').send('Błąd: Nie znaleziono konta gracza dla statystyk dziennych.');
+      return res.status(404).type('text/plain').send('Error: Player account not found for daily statistics.');
     }
 
     const history = deduplicateMatches(rawHistory);
-
     const { currenttier, ranking_in_tier, elo } = mmr.data.current_data;
     
     let rr, goal, rrToGoal;
     
     if (goalRank) {
-        const customGoal = calculateEloToCustomGoal(elo, goalRank);
-        if (customGoal === null) {
-            return res.status(400).type('text/plain').send(`Błąd: Nieprawidłowa nazwa rangi "${goalRank}". Dostępne rangi: ${Object.keys(RANK_ELO_THRESHOLDS).join(', ')}`);
-        }
-        
-        rrToGoal = customGoal.eloNeeded;
-        goal = goalRank;
-        rr = rrToGoal;
-        
-        if (customGoal.alreadyReached) {
-            goal = `${goalRank} (już osiągnięte!)`;
-            rrToGoal = 0;
-        }
+      const customGoal = calculateEloToCustomGoal(elo, goalRank);
+      if (customGoal === null) {
+        return res.status(400).type('text/plain').send(`Error: Invalid rank name "${goalRank}". Available ranks: ${Object.keys(RANK_ELO_THRESHOLDS).join(', ')}`);
+      }
+      
+      rrToGoal = customGoal.eloNeeded;
+      goal = goalRank;
+      rr = rrToGoal;
+      
+      if (customGoal.alreadyReached) {
+        goal = `${goalRank} (already achieved!)`;
+        rrToGoal = 0;
+      }
     } else {
-        const originalGoal = calculateRRToGoal(currenttier, ranking_in_tier || 0);
-        rr = originalGoal.rr;
-        goal = originalGoal.goal;
-        rrToGoal = rr;
+      const originalGoal = calculateRRToGoal(currenttier, ranking_in_tier || 0);
+      rr = originalGoal.rr;
+      goal = originalGoal.goal;
+      rrToGoal = rr;
     }
 
     const { startTime, endTime } = getSessionTimeRange(null, resetTime);
@@ -147,95 +253,127 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     const dailyRRFormatted = totalRRChange >= 0 ? `+${totalRRChange}` : totalRRChange.toString();
     const lastRRFormatted = lastMatchRR !== null ? (lastMatchRR >= 0 ? `+${lastMatchRR}` : lastMatchRR.toString()) : '-';
 
-    const lastStats = `${lastStatsRaw.stats.kills}/${lastStatsRaw.stats.deaths}/${lastStatsRaw.stats.assists}`;
-    const lastAgent = lastStatsRaw.agent.name;
-
-    //let playerLB = await findPlayer(leaderboard.data.players, name, tag);
-    //if(playerLB != 'Not found') {
-    //    playerLB = `#${playerLB.leaderboard_rank}`;
-    //} else {
-        playerLB = ``;
-    //}
-    
     let finalText = text
-        .replace(/{name}/g, name)
-        .replace(/{tag}/g, tag)
-        .replace(/{lb}/g, playerLB)
-        .replace(/{rank}/g, RANK_TIERS[currenttier] || "Unknown")
-        .replace(/{rr}/g, (ranking_in_tier || 0).toString())
-        .replace(/{rrToGoal}/g, rrToGoal.toString())
-        .replace(/{goal}/g, goal)
-        .replace(/{wl}/g, wlString)
-        .replace(/{dailyRR}/g, dailyRRFormatted)
-        .replace(/{lastRR}/g, lastRRFormatted)
+      .replace(/{name}/g, name)
+      .replace(/{tag}/g, tag)
+      .replace(/{rank}/g, RANK_TIERS[currenttier] || "Unknown")
+      .replace(/{rr}/g, (ranking_in_tier || 0).toString())
+      .replace(/{rrToGoal}/g, rrToGoal.toString())
+      .replace(/{goal}/g, goal)
+      .replace(/{wl}/g, wlString)
+      .replace(/{dailyRR}/g, dailyRRFormatted)
+      .replace(/{lastRR}/g, lastRRFormatted);
+
+    // Handle last match stats if available
+    if (lastStatsRaw && lastStatsRaw.stats) {
+      const lastStats = `${lastStatsRaw.stats.kills}/${lastStatsRaw.stats.deaths}/${lastStatsRaw.stats.assists}`;
+      const lastAgent = lastStatsRaw.agent?.name || 'Unknown';
+      finalText = finalText
         .replace(/{lastStats}/g, lastStats)
         .replace(/{lastAgent}/g, lastAgent);
+    } else {
+      finalText = finalText
+        .replace(/{lastStats}/g, '-')
+        .replace(/{lastAgent}/g, '-');
+    }
 
     const isRadiant = currenttier === 27;
     if (isRadiant && !goalRank) {
-        finalText = finalText.replace(/{rrToGoal}RR do {goal}/g, "Gratulacje Radianta!");
+      finalText = finalText.replace(/{rrToGoal}RR do {goal}/g, "Congratulations on Radiant!");
     }
     
-    // Jeśli cel został już osiągnięty, zastąp komunikat
     if (goalRank && rrToGoal === 0) {
-        finalText = finalText.replace(/{rrToGoal}RR do {goal}/g, `Cel "${goalRank}" już osiągnięty!`);
+      finalText = finalText.replace(/{rrToGoal}RR do {goal}/g, `Goal "${goalRank}" already achieved!`);
     }
     
     res.type('text/plain').send(finalText);
+    
     logToDiscord({ 
-        title: 'API Call Success: `/rank` (extended)', 
-        color: 0x00FF00, 
-        fields: [
-            { name: 'Player', value: `\`${name}#${tag}\``, inline: true }, 
-            { name: 'Custom Goal', value: goalRank ? `\`${goalRank}\`` : 'Default (next rank)', inline: true },
-            { name: 'Result', value: `\`${finalText}\``, inline: false }
-        ], 
-        timestamp: new Date().toISOString(), 
-        footer: { text: `IP: ${req.ip}` } 
+      title: 'API Call Success: `/rank` (extended)', 
+      color: 0x00FF00, 
+      fields: [
+        { name: 'Player', value: `\`${name}#${tag}\``, inline: true }, 
+        { name: 'Custom Goal', value: goalRank ? `\`${goalRank}\`` : 'Default (next rank)', inline: true },
+        { name: 'Result', value: `\`${finalText.substring(0, 200)}${finalText.length > 200 ? '...' : ''}\``, inline: false }
+      ], 
+      timestamp: new Date().toISOString(), 
+      footer: { text: `IP: ${req.ip}` } 
     });
+  } catch (error) {
+    log.error('RANK_ENDPOINT', `Error processing rank request for ${name}#${tag}`, error);
+    res.status(500).type('text/plain').send('Error: Internal server error occurred.');
+  }
 }));
 
-router.get('/rankraw/:name/:tag/:region', asyncHandler(async (req, res, next) => {
-    const { name, tag, region } = req.params;
+function isValidPlayerName(name) {
+  // Decode URL-encoded characters (like %20 for space)
+  const decodedName = decodeURIComponent(name);
+  return /^[\p{L}\p{N}_\-\s\.]{3,16}$/u.test(decodedName);
+}
 
-    if (!VALID_REGIONS.includes(region.toLowerCase())) {
-        return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
+/**
+ * @swagger
+ * /wl/{name}/{tag}/{region}:
+ *   get:
+ *     summary: Get player win/loss statistics for current session
+ *     tags: [Statistics]
+ *     parameters:
+ *       - in: path
+ *         name: name
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: tag
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: region
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [na, eu, ap, kr, latam, br]
+ *     responses:
+ *       200:
+ *         description: Win/loss statistics
+ *       400:
+ *         description: Invalid parameters
+ *       404:
+ *         description: Player not found
+ */
+router.get('/wl/:name/:tag/:region', [
+  param('name').custom(value => {
+    if (!isValidPlayerName(value)) {
+      throw new Error('Name must be 3-16 characters and contain only letters, numbers, spaces, underscores, hyphens, and dots');
     }
-
-    const [mmr, account] = await Promise.all([
-        fetchPlayerMMR(name, tag, region),
-        fetchAccountDetails(name, tag)
-    ]);
-    
-    res.type('text/plain').send({ mmr, account });
-    logToDiscord({ 
-        title: 'API Call Success: `/rankraw` (extended)', 
-        color: 0x00FF00, 
-        fields: [
-            { name: 'Player', value: `\`${name}#${tag}\``, inline: true }, 
-            { name: 'Result', value: `\`${ mmr, account }\``, inline: false }
-        ], 
-        timestamp: new Date().toISOString(), 
-        footer: { text: `IP: ${req.ip}` } 
-    });
-}));
-
-router.get('/wl/:name/:tag/:region', asyncHandler(async (req, res, next) => {
-    const { name, tag, region } = req.params;
-    const { resetTime, sessionStart } = req.query;
-    
-    if (!VALID_REGIONS.includes(region.toLowerCase())) {
-        return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
+    return true;
+  }),
+  param('tag').custom(value => {
+    if (!isValidPlayerTag(value)) {
+      throw new Error('Tag must be 3-5 characters and contain only letters and numbers');
     }
-    
+    return true;
+  }),
+  param('region').isIn(VALID_REGIONS).withMessage('Invalid region')
+], asyncHandler(async (req, res, next) => {
+  const { name, tag, region } = req.params;
+  const { resetTime, sessionStart } = req.query;
+  
+  const validationError = validatePlayerInput(name, tag, region);
+  if (validationError) {
+    return res.status(400).type('text/plain').send(`Error: ${validationError}`);
+  }
+  
+  try {
     const [account, rawHistory, mmrHistory] = await Promise.all([
-        fetchAccountDetails(name, tag), 
-        fetchMatchHistory(name, tag, region, 'competitive', 20),
-        fetchMMRHistory(name, tag, region)
+      fetchAccountDetails(name, tag), 
+      fetchMatchHistory(name, tag, region, 'competitive', 20),
+      fetchMMRHistory(name, tag, region)
     ]);
     
     if (!account.data?.puuid) {
-        return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza.');
+      return res.status(404).type('text/plain').send('Error: Player not found.');
     }
     
     const history = deduplicateMatches(rawHistory);
@@ -246,202 +384,107 @@ router.get('/wl/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     
     const result = draws > 0 ? `${wins}W/${draws}D/${losses}L` : `${wins}W/${losses}L`;
     res.type('text/plain').send(result);
-    logToDiscord({ title: 'API Call Success: `/wl`', color: 0x00FF00, fields: [{ name: 'Player', value: `\`${name}#${tag}\``, inline: true }, { name: 'Result', value: `\`${result}\``, inline: false }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
+    
+    logToDiscord({ 
+      title: 'API Call Success: `/wl`', 
+      color: 0x00FF00, 
+      fields: [
+        { name: 'Player', value: `\`${name}#${tag}\``, inline: true }, 
+        { name: 'Result', value: `\`${result}\``, inline: false }
+      ], 
+      timestamp: new Date().toISOString(), 
+      footer: { text: `IP: ${req.ip}` } 
+    });
+  } catch (error) {
+    log.error('WL_ENDPOINT', `Error processing WL request for ${name}#${tag}`, error);
+    res.status(500).type('text/plain').send('Error: Internal server error occurred.');
+  }
 }));
 
-router.get('/advanced_wl/:name/:tag/:region', asyncHandler(async (req, res, next) => {
-    const { name, tag, region } = req.params;
-    const { resetTime } = req.query;
-    
-    if (!VALID_REGIONS.includes(region.toLowerCase())) {
-        return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
-    }
-    
-    const [account, rawHistory, mmrHistory] = await Promise.all([ 
-        fetchAccountDetails(name, tag), 
-        fetchMatchHistory(name, tag, region, 'competitive', 25), 
-        fetchMMRHistory(name, tag, region)
-    ]);
-    
-    if (!account.data?.puuid) {
-        return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza.');
-    }
-    
-    const history = deduplicateMatches(rawHistory);
-    
-    const { startTime, endTime } = getSessionTimeRange(null, resetTime);
-    const mmrHistoryArray = mmrHistory?.data || [];
-    let { wins, losses, draws, lastMatchResult, lastMatchRR } = calculateSessionStats(history, mmrHistoryArray, account.data.puuid, startTime, endTime);
-    
-    let result = draws > 0 ? `${wins}W/${draws}D/${losses}L` : `${wins}W/${losses}L`;
-    if (lastMatchResult) {
-        result += ` (Last:`;
-        if (lastMatchRR != null) { result += ` ${lastMatchRR >= 0 ? '+' : ''}${lastMatchRR}RR`; }
-        result += ')';
-    }
-    res.type('text/plain').send(result);
-    logToDiscord({ title: 'API Call Success: `/advanced_wl`', color: 0x00FF00, fields: [{ name: 'Player', value: `\`${name}#${tag}\``}, { name: 'Result', value: `\`${result}\`` }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
-}));
+/**
+ * @swagger
+ * /getrank/{position}:
+ *   get:
+ *     summary: Get player information by leaderboard position
+ *     tags: [Leaderboard]
+ *     parameters:
+ *       - in: path
+ *         name: position
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Leaderboard position (1-15000)
+ *     responses:
+ *       200:
+ *         description: Player information
+ *       400:
+ *         description: Invalid position
+ *       404:
+ *         description: Position not found
+ */
+router.get('/getrank/:position', [
+  param('position').isInt({ min: 1, max: 15000 }).withMessage('Position must be between 1 and 15000')
+], asyncHandler(async (req, res, next) => {
+  const { position } = req.params;
+  const rankPosition = parseInt(position, 10);
 
-router.get('/daily/:name/:tag/:region', asyncHandler(async (req, res, next) => {
-    const { name, tag, region } = req.params;
-    const { resetTime } = req.query;
-
-    if (!VALID_REGIONS.includes(region.toLowerCase())) {
-        return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
-    }
-
-    const [account, rawHistory, mmr, mmrHistory] = await Promise.all([
-        fetchAccountDetails(name, tag),
-        fetchMatchHistory(name, tag, region, 'competitive', 25),
-        fetchPlayerMMR(name, tag, region),
-        fetchMMRHistoryDaily(name, tag, region)
-    ]);
-    
-    if (!account.data?.puuid) {
-        return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza.');
-    }
-    if (!mmr.data?.current_data) {
-        return res.status(404).type('text/plain').send('Błąd: Brak danych rankingowych dla gracza.');
-    }
-
-    const history = deduplicateMatches(rawHistory);
-
-    const { startTime, endTime } = getSessionTimeRange(null, resetTime);
-    const mmrHistoryArray = mmrHistory?.data?.history || [];
-    let { wins, losses, draws, lastMatchRR, totalRRChange } = calculateSessionStats(history, mmrHistoryArray, account.data.puuid, startTime, endTime);
-    
-    const { currenttier, ranking_in_tier } = mmr.data.current_data;
-    const rankName = RANK_TIERS[currenttier] || "Brak Rangi";
-    const wlString = draws > 0 ? `${wins}W/${draws}D/${losses}L` : `${wins}W/${losses}L`;
-    const dailyRRFormatted = totalRRChange >= 0 ? `+${totalRRChange}` : totalRRChange;
-
-    let responseText = `${rankName} ${ranking_in_tier || 0}RR | Bilans: ${wlString} | Dzisiaj: ${dailyRRFormatted}RR`;
-    if (lastMatchRR !== null && (wins > 0 || losses > 0 || draws > 0)) {
-        responseText += ` | Last: ${lastMatchRR >= 0 ? '+' : ''}${lastMatchRR}RR`;
-    }
-    
-    res.type('text/plain').send(responseText);
-    logToDiscord({ title: 'API Call Success: `/daily`', color: 0x00FF00, fields: [{ name: 'Player', value: `\`${name}#${tag}\`` }, { name: 'Result', value: `\`${responseText}\`` }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
-}));
-
-router.get('/getrank/:position', asyncHandler(async (req, res, next) => {
-    const { position } = req.params;
-    const rankPosition = parseInt(position, 10);
-
-    if (isNaN(rankPosition) || rankPosition <= 0) {
-        return res.status(400).type('text/plain').send('Błąd: Podano nieprawidłową pozycję.');
-    }
-    if (rankPosition > 15000) {
-        return res.type('text/plain').send(`Leaderboard VALORANT obsługuje tylko top 15000!`);
-    }
-
+  try {
     const player = findPlayerByRank(rankPosition);
     if (!player) {
-        return res.status(404).type('text/plain').send(`Błąd: Ranga ${rankPosition} nie została znaleziona w tabeli wyników.`);
+      return res.status(404).type('text/plain').send(`Error: Rank ${rankPosition} not found in leaderboard.`);
     }
 
     const isAnonymized = !player.gameName;
     const result = isAnonymized
-        ? `Profil prywatny | Rating: ${player.rankedRating}RR | Wygrane: ${player.numberOfWins}`
-        : `${player.gameName}#${player.tagLine} | Rating: ${player.rankedRating}RR | Wygrane: ${player.numberOfWins} | Tracker: https://tracker.gg/valorant/profile/riot/${encodeURIComponent(player.gameName)}%23${encodeURIComponent(player.tagLine)}/overview`;
+      ? `Private profile | Rating: ${player.rankedRating}RR | Wins: ${player.numberOfWins}`
+      : `${player.gameName}#${player.tagLine} | Rating: ${player.rankedRating}RR | Wins: ${player.numberOfWins} | Tracker: https://tracker.gg/valorant/profile/riot/${encodeURIComponent(player.gameName)}%23${encodeURIComponent(player.tagLine)}/overview`;
     
     res.type('text/plain').send(result);
-    logToDiscord({ title: 'API Call Success: `/getrank`', color: 0x00FF00, fields: [{ name: 'Position', value: `\`${rankPosition}\``, inline: true }, { name: 'Result', value: `\`${result}\``, inline: false }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
+    
+    logToDiscord({ 
+      title: 'API Call Success: `/getrank`', 
+      color: 0x00FF00, 
+      fields: [
+        { name: 'Position', value: `\`${rankPosition}\``, inline: true }, 
+        { name: 'Result', value: `\`${result.substring(0, 200)}${result.length > 200 ? '...' : ''}\``, inline: false }
+      ], 
+      timestamp: new Date().toISOString(), 
+      footer: { text: `IP: ${req.ip}` } 
+    });
+  } catch (error) {
+    log.error('GETRANK_ENDPOINT', `Error processing getrank request for position ${rankPosition}`, error);
+    res.status(500).type('text/plain').send('Error: Internal server error occurred.');
+  }
 }));
 
-router.get('/nextmatch/:event', asyncHandler(async (req, res, next) => {
-    const { event } = req.params;
-    const matches = await vlr.getUpcomingMatches();
-    const nextMatch = matches.data.find(match => 
-        match.event.name.toLowerCase() === event.toLowerCase()
-    );
-    if (!nextMatch) {
-        const result = `Nie znaleziono nadchodzących meczy dla wydarzenia: "${event}". Sprawdź, czy nazwa jest poprawna.`;
-        res.status(404).type('text/plain').send(result);
-        logToDiscord({ 
-            title: 'API Call Info: `/nextmatch` - Not Found', 
-            color: 0xFFA500,
-            fields: [{ name: 'Event Searched', value: `\`${event}\``, inline: true }], 
-            timestamp: new Date().toISOString(), 
-            footer: { text: `IP: ${req.ip}` } 
-        });
-        return;
-    }
-
-    const date = formatMatchDateTimeShort(nextMatch.date, nextMatch.time);
-    const timeUntil = getTimeUntilMatch(nextMatch.date, nextMatch.time);
-
-    const result = `Następny mecz na "${event}" to: ${nextMatch.teams[0].name} vs ${nextMatch.teams[1].name} za ${timeUntil} (${date})`;
-
-    res.type('text/plain').send(result);
-    logToDiscord({ title: 'API Call Success: `/nextmatch`', color: 0x00FF00, fields: [ { name: 'Event', value: `\`${event}\``, inline: true }, { name: 'Result', value: `\`${result}\``, inline: false } ], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
-
+/**
+ * @swagger
+ * /api/cache/stats:
+ *   get:
+ *     summary: Get cache statistics
+ *     tags: [System]
+ *     responses:
+ *       200:
+ *         description: Cache statistics
+ */
+router.get('/api/cache/stats', asyncHandler(async (req, res) => {
+  const stats = getCacheStats();
+  res.json(standardResponse(stats));
 }));
 
-router.get('/dailymatches/:event', asyncHandler(async (req, res, next) => {
-    const { event } = req.params;
-    const matches = await vlr.getUpcomingMatches();
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const dailyMatches = matches.data.filter(match => {
-        if (!match.event?.name || !match.date) {
-            return false;
-        }
-        if (match.event.name.toLowerCase() !== event.toLowerCase()) {
-            return false;
-        }
-
-        const matchDate = new Date(match.date);
-        if (isNaN(matchDate.getTime())) {
-            return false;
-        }
-        matchDate.setHours(0, 0, 0, 0);
-
-        return matchDate.getTime() === today.getTime();
-    });
-
-    if (dailyMatches.length === 0) {
-        const result = `Nie znaleziono na dzisiaj żadnych meczy dla wydarzenia: "${EVENTS[event]}".`;
-        res.status(200).type('text/plain').send(result);
-        logToDiscord({
-            title: 'API Call Info: `/dailymatches` - Not Found',
-            color: 0xFFA500,
-            fields: [{ name: 'Event Searched', value: `\`${event}\``, inline: true }],
-            timestamp: new Date().toISOString(),
-            footer: { text: `IP: ${req.ip}` }
-        });
-        return;
-    }
-
-    dailyMatches.sort((a, b) => {
-        const timeA = a.time?.replace(':', '') || '0';
-        const timeB = b.time?.replace(':', '') || '0';
-        return parseInt(timeA) - parseInt(timeB);
-    });
-
-    const matchesStrings = dailyMatches.map(match => {
-        const time = formatMatchDateTimeShortHour(match.date, match.time) || 'brak godziny';
-        const teamA = TEAMS[match.teams[0]?.name] || 'TBD';
-        const teamB = TEAMS[match.teams[1]?.name] || 'TBD';
-        return `${time} ${teamA} vs ${teamB}`;
-    });
-
-    const result = `Dzisiejsze mecze ${EVENTS[event]}: ${matchesStrings.join(' | ')}`;
-
-    res.type('text/plain').send(result);
-    logToDiscord({
-        title: 'API Call Success: `/dailymatches`',
-        color: 0x00FF00,
-        fields: [
-            { name: 'Event', value: `\`${event}\``, inline: true },
-            { name: 'Result', value: `\`${result}\``, inline: false }
-        ],
-        timestamp: new Date().toISOString(),
-        footer: { text: `IP: ${req.ip}` }
-    });
+/**
+ * @swagger
+ * /api/cache/clear:
+ *   post:
+ *     summary: Clear cache
+ *     tags: [System]
+ *     responses:
+ *       200:
+ *         description: Cache cleared successfully
+ */
+router.post('/api/cache/clear', asyncHandler(async (req, res) => {
+  clearCache();
+  res.json(standardResponse(null, 'Cache cleared successfully'));
 }));
 
 module.exports = router;
