@@ -38,12 +38,12 @@ initLeaderboard();
  * @returns {Object|null} Player data or null if not found
  */
 function findPlayerByRank(position) {
-  if (!leaderboardData || !Array.isArray(leaderboardData.players)) {
+  if (!leaderboardData || !leaderboardData.data || !Array.isArray(leaderboardData.data.players)) {
     log.warn('LEADERBOARD', 'Leaderboard data not available');
     return null;
   }
   
-  const player = leaderboardData.players.find(p => p.leaderboard_rank === position);
+  const player = leaderboardData.data.players.find(p => p.leaderboardRank === position);
   
   if (!player) {
     log.debug('LEADERBOARD', `Player not found at position ${position}`);
@@ -60,12 +60,12 @@ function findPlayerByRank(position) {
  * @returns {Object|null} Player data or null if not found
  */
 function findPlayerByNameTag(name, tag) {
-  if (!leaderboardData || !Array.isArray(leaderboardData.players)) {
+  if (!leaderboardData || !leaderboardData.data || !Array.isArray(leaderboardData.data.players)) {
     log.warn('LEADERBOARD', 'Leaderboard data not available');
     return null;
   }
   
-  const player = leaderboardData.players.find(p => 
+  const player = leaderboardData.data.players.find(p => 
     p.gameName === name && p.tagLine === tag
   );
   
@@ -84,14 +84,14 @@ function findPlayerByNameTag(name, tag) {
  * @returns {Array} Array of players in range
  */
 function getPlayersInRange(start, end) {
-  if (!leaderboardData || !Array.isArray(leaderboardData.players)) {
+  if (!leaderboardData || !leaderboardData.data || !Array.isArray(leaderboardData.data.players)) {
     log.warn('LEADERBOARD', 'Leaderboard data not available');
     return [];
   }
   
-  return leaderboardData.players
-    .filter(p => p.leaderboard_rank >= start && p.leaderboard_rank <= end)
-    .sort((a, b) => a.leaderboard_rank - b.leaderboard_rank);
+  return leaderboardData.data.players
+    .filter(p => p.leaderboardRank >= start && p.leaderboardRank <= end)
+    .sort((a, b) => a.leaderboardRank - b.leaderboardRank);
 }
 
 /**
@@ -99,7 +99,7 @@ function getPlayersInRange(start, end) {
  * @returns {Object} Statistics about the leaderboard
  */
 function getLeaderboardStats() {
-  if (!leaderboardData || !Array.isArray(leaderboardData.players)) {
+  if (!leaderboardData || !leaderboardData.data || !Array.isArray(leaderboardData.data.players)) {
     return {
       totalPlayers: 0,
       averageRR: 0,
@@ -109,7 +109,7 @@ function getLeaderboardStats() {
     };
   }
   
-  const players = leaderboardData.players;
+  const players = leaderboardData.data.players;
   const totalPlayers = players.length;
   
   if (totalPlayers === 0) {
@@ -158,12 +158,12 @@ function reloadLeaderboard() {
  * @returns {Array} Array of matching players
  */
 function searchPlayers(searchTerm, limit = 10) {
-  if (!leaderboardData || !Array.isArray(leaderboardData.players)) {
+  if (!leaderboardData || !leaderboardData.data || !Array.isArray(leaderboardData.data.players)) {
     return [];
   }
   
   const term = searchTerm.toLowerCase();
-  const matches = leaderboardData.players
+  const matches = leaderboardData.data.players
     .filter(p => 
       (p.gameName && p.gameName.toLowerCase().includes(term)) ||
       (p.tagLine && p.tagLine.toLowerCase().includes(term))
