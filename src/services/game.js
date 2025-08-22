@@ -55,9 +55,24 @@ function calculateSessionStats(matchHistory, mmrHistory, playerPUUID, startTime,
 
     // Process match history
     if (matchHistory && matchHistory.data && Array.isArray(matchHistory.data)) {
+        let debugCount = 0;
         for (const match of matchHistory.data) {
+            // Log structure of first few matches for debugging
+            if (debugCount < 3) {
+                log.debug('SESSION_STATS', `Match ${debugCount + 1} structure:`, {
+                    matchId: match.metadata?.matchid,
+                    hasTeams: !!match.teams,
+                    teamsType: Array.isArray(match.teams) ? 'array' : typeof match.teams,
+                    hasRounds: !!match.rounds,
+                    roundsType: Array.isArray(match.rounds) ? 'array' : typeof match.rounds,
+                    playersType: Array.isArray(match.players) ? 'array' : typeof match.players,
+                    all_playersType: Array.isArray(match.players?.all_players) ? 'array' : typeof match.players?.all_players
+                });
+                debugCount++;
+            }
+
             const matchTime = new Date(match.metadata?.game_start_iso || match.meta?.start_time);
-            
+
             // Skip matches outside session time range
             if (matchTime < startTime || matchTime > endTime) {
                 continue;
@@ -65,17 +80,61 @@ function calculateSessionStats(matchHistory, mmrHistory, playerPUUID, startTime,
 
             // Find player in the match
             const player = match.players?.all_players?.find(p => p.puuid === playerPUUID) ||
-                         match.players?.find(p => p.puuid === playerPUUID);
+                match.players?.find(p => p.puuid === playerPUUID);
 
             if (!player) {
                 log.debug('SESSION_STATS', `Player ${playerPUUID} not found in match ${match.metadata?.matchid}`);
                 continue;
             }
 
-            // Determine match result
-            const team = match.teams?.find(t => t.team_id === player.team_id);
-            const hasWon = team?.has_won;
-            
+            // Determine match result - handle different possible data structures
+            let hasWon = undefined;
+
+            // Try different possible structures for match result
+            if (match.teams && Array.isArray(match.teams)) {
+                const team = match.teams.find(t => t.team_id === player.team_id);
+                hasWon = team?.has_won;
+                log.debug('SESSION_STATS', `Team structure found for match ${match.metadata?.matchid}:`, {
+                    playerTeamId: player.team_id,
+                    foundTeam: !!team,
+                    hasWon: hasWon
+                });
+            } else if (match.rounds && Array.isArray(match.rounds)) {
+                // Some API responses use rounds structure
+                const playerTeamRounds = match.rounds.filter(round =>
+                    round.teams && round.teams.find(t => t.team_id === player.team_id)
+                );
+                const wonRounds = playerTeamRounds.filter(round => {
+                    const team = round.teams.find(t => t.team_id === player.team_id);
+                    return team && team.won;
+                });
+                hasWon = wonRounds.length > playerTeamRounds.length / 2;
+                log.debug('SESSION_STATS', `Rounds structure found for match ${match.metadata?.matchid}:`, {
+                    totalRounds: playerTeamRounds.length,
+                    wonRounds: wonRounds.length,
+                    hasWon: hasWon
+                });
+            }
+
+            // Additional check: look for blue/red team structure (common in Valorant APIs)
+            if (hasWon === undefined && match.teams) {
+                const blueTeam = match.teams.find(t => t.team_id === 'Blue' || t.team_id === 'blue');
+                const redTeam = match.teams.find(t => t.team_id === 'Red' || t.team_id === 'red');
+
+                if (blueTeam && redTeam) {
+                    // Check if player is on blue team
+                    if (player.team_id === 'Blue' || player.team_id === 'blue') {
+                        hasWon = blueTeam.has_won;
+                        matchDebugInfo.blueRedTeam = 'blue';
+                        matchDebugInfo.method = 'blue_red';
+                    } else if (player.team_id === 'Red' || player.team_id === 'red') {
+                        hasWon = redTeam.has_won;
+                        matchDebugInfo.blueRedTeam = 'red';
+                        matchDebugInfo.method = 'blue_red';
+                    }
+                }
+            }
+
             if (hasWon === true) {
                 wins++;
                 lastMatchResult = 'win';
@@ -83,8 +142,31 @@ function calculateSessionStats(matchHistory, mmrHistory, playerPUUID, startTime,
                 losses++;
                 lastMatchResult = 'loss';
             } else {
-                draws++;
-                lastMatchResult = 'draw';
+                // Check for actual draw conditions (very rare in Valorant)
+                if (match.teams && Array.isArray(match.teams) && match.teams.length >= 2) {
+                    const team1 = match.teams[0];
+                    const team2 = match.teams[1];
+                    if (team1.rounds_won !== undefined && team2.rounds_won !== undefined) {
+                        if (team1.rounds_won === team2.rounds_won) {
+                            // This is a legitimate draw/tie
+                            draws++;
+                            lastMatchResult = 'draw';
+                            log.debug('SESSION_STATS', `Legitimate draw detected in match ${match.metadata?.matchid}`);
+                        } else {
+                            // Can't determine result, skip this match
+                            log.debug('SESSION_STATS', `Could not determine match result for ${playerPUUID} in match ${match.metadata?.matchid} - no clear win/loss data`, matchDebugInfo);
+                            continue;
+                        }
+                    } else {
+                        // Can't determine result, skip this match
+                        log.debug('SESSION_STATS', `Could not determine match result for ${playerPUUID} in match ${match.metadata?.matchid} - no score data`, matchDebugInfo);
+                        continue;
+                    }
+                } else {
+                    // Can't determine result, skip this match
+                    log.debug('SESSION_STATS', `Could not determine match result for ${playerPUUID} in match ${match.metadata?.matchid} - no teams data`, matchDebugInfo);
+                    continue;
+                }
             }
 
             lastMatchTime = matchTime;
@@ -101,9 +183,9 @@ function calculateSessionStats(matchHistory, mmrHistory, playerPUUID, startTime,
         if (sessionMMR.length >= 2) {
             const firstMMR = sessionMMR[0];
             const lastMMR = sessionMMR[sessionMMR.length - 1];
-            
+
             totalRRChange = (lastMMR.ranking_in_tier || 0) - (firstMMR.ranking_in_tier || 0);
-            
+
             // Calculate last match RR change
             if (sessionMMR.length > 1) {
                 const secondLastMMR = sessionMMR[sessionMMR.length - 2];
@@ -137,7 +219,7 @@ function calculateSessionStats(matchHistory, mmrHistory, playerPUUID, startTime,
 function calculateWinRate(wins, losses, draws = 0) {
     const totalMatches = wins + losses + draws;
     if (totalMatches === 0) return 0;
-    
+
     return Math.round((wins / totalMatches) * 100);
 }
 
@@ -172,7 +254,7 @@ function calculatePerformanceMetrics(matchHistory, playerPUUID) {
 
     for (const match of matchHistory.data) {
         const player = match.players?.all_players?.find(p => p.puuid === playerPUUID) ||
-                     match.players?.find(p => p.puuid === playerPUUID);
+            match.players?.find(p => p.puuid === playerPUUID);
 
         if (!player || !player.stats) continue;
 
@@ -253,7 +335,7 @@ function getRankProgression(mmrHistory) {
         // Track rank changes
         if (lastTier !== null && tier !== lastTier) {
             rankChanges++;
-            
+
             // Update streak
             if (tier > lastTier) {
                 currentStreak++;
