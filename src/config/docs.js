@@ -31,7 +31,8 @@ const apiEndpoints = [
         params: [
             '?text="{rank} ({rr} RR) | Ostatnia gra: {lastStats} jako {lastAgent}"',
             "Dostępne zmienne: {name}, {tag}, {lb}, {rank}, {rr}, {rrToGoal}, {goal}, {wl}, {dailyRR}, {lastRR}, {lastStats}, {lastAgent}",
-            "?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)"
+            "?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)",
+            "?goalRank=RANK - Własny cel rangi (np. Immortal)"
         ],
         example: {
             request: "/rank/Szalony/123/eu?text={rank} ({rr}RR) | Ostatnio: {lastAgent} ({lastStats})",
@@ -39,15 +40,61 @@ const apiEndpoints = [
         }
     },
     {
+        title: "📅 Dzienne Statystyki",
+        endpoint: "GET /daily/{name}/{tag}/{region}",
+        description: "Zwraca podsumowanie dzisiejszych statystyk gracza włącznie z rangą, bilansem W/L i zmianą RR.",
+        params: [
+            "?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)"
+        ],
+        example: {
+            request: "/daily/Szalony/123/eu",
+            response: "Diament 2 67RR | Bilans: 3W/1L | Dzisiaj: +33RR | Last: +23RR"
+        }
+    },
+    {
+        title: "🔍 Surowe Dane Rankingu",
+        endpoint: "GET /rankraw/{name}/{tag}/{region}",
+        description: "Zwraca surowe dane API dotyczące gracza bez formatowania. Przydatne do debugowania i integracji.",
+        params: [],
+        example: {
+            request: "/rankraw/Szalony/123/eu",
+            response: "{ mmr: {...}, account: {...} }"
+        }
+    },
+    {
         title: "🏅 Wyszukiwanie w Tabeli Wyników",
         endpoint: "GET /getrank/{position}",
-        description: "Wyszukaj graczy po ich pozycji w tabeli wyników (tylko EU, top 1000). Pokazuje rating, wygrane i link do trackera. Dane pochodzą ze statycznego pliku.",
+        description: "Wyszukaj graczy po ich pozycji w tabeli wyników (top 15000). Pokazuje rating, wygrane i link do trackera. Dane pochodzą ze statycznego pliku.",
         params: [
-            "position: 1-1000 (pozycja w tabeli)"
+            "position: 1-15000 (pozycja w tabeli)"
         ],
         example: {
             request: "/getrank/50",
             response: "Player#TAG | Rating: 892RR | Wygrane: 156 | Tracker: ..."
+        }
+    },
+    {
+        title: "🔮 Nadchodzące Mecze",
+        endpoint: "GET /nextmatch/{event}",
+        description: "Znajdź następny mecz dla określonego wydarzenia e-sportowego. Dane pobierane z VLR.gg.",
+        params: [
+            "event: Nazwa wydarzenia (np. VCT, EMEA)"
+        ],
+        example: {
+            request: "/nextmatch/VCT",
+            response: "Następny mecz na \"VCT\" to: Team A vs Team B za 2h 30m (2025-01-15 18:00)"
+        }
+    },
+    {
+        title: "📅 Dzienne Mecze",
+        endpoint: "GET /dailymatches/{event}",
+        description: "Pobierz wszystkie dzisiejsze mecze dla określonego wydarzenia e-sportowego. Dane pobierane z VLR.gg.",
+        params: [
+            "event: Nazwa wydarzenia (np. VCT, EMEA)"
+        ],
+        example: {
+            request: "/dailymatches/VCT",
+            response: "Dzisiejsze mecze VCT International: 14:00 Team A vs Team B | 17:00 Team C vs Team D"
         }
     },
     {
@@ -63,7 +110,7 @@ const apiEndpoints = [
     {
         title: "🩺 Health Check",
         endpoint: "GET /health",
-        description: "Zwraca status techniczny API. Służy do monitorowania działania serwisu. Zwraca kod 200, jeśli wszystko działa, lub 503, jeśli występuje problem (np. brak połączenia z API Henrika).",
+        description: "Zwraca status techniczny API. Służy do monitorowania działania serwisu. Zwraca kod 200, jeśli wszystko działa, lub 503, jeśli występuje problem.",
         params: [],
         example: {
             request: "/health",
@@ -78,6 +125,16 @@ const apiEndpoints = [
         example: {
             request: "/status",
             response: "Zwraca stronę HTML z paskami statusu..."
+        }
+    },
+    {
+        title: "📚 Dokumentacja API",
+        endpoint: "GET /api-docs",
+        description: "Interaktywna dokumentacja Swagger UI z pełnym opisem wszystkich endpointów API.",
+        params: [],
+        example: {
+            request: "/api-docs",
+            response: "Zwraca stronę Swagger UI..."
         }
     }
 ];

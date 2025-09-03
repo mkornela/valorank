@@ -80,30 +80,62 @@
             </div>
             <div class="api-card">
                 <h2 class="api-title">🎖️ Informacje o Randze (Rozszerzone)</h2>
-                <p class="api-description">Pobierz aktualną rangę, RR i postęp do następnej rangi. Endpoint został połączony z funkcjonalnością dziennych statystyk, dzięki czemu możesz dołączyć do odpowiedzi bilans wygranych/przegranych, dzienną zmianę RR oraz zmianę RR z ostatniego meczu.</p>
+                <p class="api-description">Pobierz aktualną rangę, RR i postęp do następnej rangi. Endpoint został połączony z funkcjonalnością dziennych statystyk, dzięki czemu możesz dołączyć do odpowiedzi bilans wygranych/przegranych, dzienną zmianę RR, zmianę RR z ostatniego meczu, a także statystyki (K/D/A) i agenta z ostatniej gry.</p>
                 <div class="api-endpoint">GET /rank/{name}/{tag}/{region}</div>
                 
                 <div class="details-section">
                     <h3 class="details-title">Parametry</h3>
-                    <ul class="param-list"><li>?text="{rank} ({rr} RR) | Daily: {wl} ({dailyRR} RR) | Last: {lastRR} RR"</li><li>Dostępne zmienne: {name}, {tag}, {rank}, {rr}, {rrToGoal}, {goal}, {wl}, {dailyRR}, {lastRR}</li><li>?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)</li></ul>
+                    <ul class="param-list"><li>?text="{rank} ({rr} RR) | Ostatnia gra: {lastStats} jako {lastAgent}"</li><li>Dostępne zmienne: {name}, {tag}, {lb}, {rank}, {rr}, {rrToGoal}, {goal}, {wl}, {dailyRR}, {lastRR}, {lastStats}, {lastAgent}</li><li>?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)</li><li>?goalRank=RANK - Własny cel rangi (np. Immortal)</li></ul>
                 </div>
                 
                 <div class="details-section">
                     <h3 class="details-title">Przykład</h3>
                     <div class="example-block">
-                        <div class="req"><span>Request:</span> /rank/Szalony/123/eu?text={rank} ({rr} RR) | Daily: {dailyRR} RR</div>
-                        <div class="res"><span>Response:</span> Diament 2 (67 RR) | Daily: +33 RR</div>
+                        <div class="req"><span>Request:</span> /rank/Szalony/123/eu?text={rank} ({rr}RR) | Ostatnio: {lastAgent} ({lastStats})</div>
+                        <div class="res"><span>Response:</span> Diament 2 (67RR) | Ostatnio: Jett (21/15/8)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="api-card">
+                <h2 class="api-title">📅 Dzienne Statystyki</h2>
+                <p class="api-description">Zwraca podsumowanie dzisiejszych statystyk gracza włącznie z rangą, bilansem W/L i zmianą RR.</p>
+                <div class="api-endpoint">GET /daily/{name}/{tag}/{region}</div>
+                
+                <div class="details-section">
+                    <h3 class="details-title">Parametry</h3>
+                    <ul class="param-list"><li>?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)</li></ul>
+                </div>
+                
+                <div class="details-section">
+                    <h3 class="details-title">Przykład</h3>
+                    <div class="example-block">
+                        <div class="req"><span>Request:</span> /daily/Szalony/123/eu</div>
+                        <div class="res"><span>Response:</span> Diament 2 67RR | Bilans: 3W/1L | Dzisiaj: +33RR | Last: +23RR</div>
+                    </div>
+                </div>
+            </div>
+            <div class="api-card">
+                <h2 class="api-title">🔍 Surowe Dane Rankingu</h2>
+                <p class="api-description">Zwraca surowe dane API dotyczące gracza bez formatowania. Przydatne do debugowania i integracji.</p>
+                <div class="api-endpoint">GET /rankraw/{name}/{tag}/{region}</div>
+                
+                
+                <div class="details-section">
+                    <h3 class="details-title">Przykład</h3>
+                    <div class="example-block">
+                        <div class="req"><span>Request:</span> /rankraw/Szalony/123/eu</div>
+                        <div class="res"><span>Response:</span> { mmr: {...}, account: {...} }</div>
                     </div>
                 </div>
             </div>
             <div class="api-card">
                 <h2 class="api-title">🏅 Wyszukiwanie w Tabeli Wyników</h2>
-                <p class="api-description">Wyszukaj graczy po ich pozycji w tabeli wyników (tylko EU, top 1000). Pokazuje rating, wygrane i link do trackera. Dane pochodzą ze statycznego pliku.</p>
+                <p class="api-description">Wyszukaj graczy po ich pozycji w tabeli wyników (top 15000). Pokazuje rating, wygrane i link do trackera. Dane pochodzą ze statycznego pliku.</p>
                 <div class="api-endpoint">GET /getrank/{position}</div>
                 
                 <div class="details-section">
                     <h3 class="details-title">Parametry</h3>
-                    <ul class="param-list"><li>position: 1-1000 (pozycja w tabeli)</li></ul>
+                    <ul class="param-list"><li>position: 1-15000 (pozycja w tabeli)</li></ul>
                 </div>
                 
                 <div class="details-section">
@@ -111,6 +143,42 @@
                     <div class="example-block">
                         <div class="req"><span>Request:</span> /getrank/50</div>
                         <div class="res"><span>Response:</span> Player#TAG | Rating: 892RR | Wygrane: 156 | Tracker: ...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="api-card">
+                <h2 class="api-title">🔮 Nadchodzące Mecze</h2>
+                <p class="api-description">Znajdź następny mecz dla określonego wydarzenia e-sportowego. Dane pobierane z VLR.gg.</p>
+                <div class="api-endpoint">GET /nextmatch/{event}</div>
+                
+                <div class="details-section">
+                    <h3 class="details-title">Parametry</h3>
+                    <ul class="param-list"><li>event: Nazwa wydarzenia (np. VCT, EMEA)</li></ul>
+                </div>
+                
+                <div class="details-section">
+                    <h3 class="details-title">Przykład</h3>
+                    <div class="example-block">
+                        <div class="req"><span>Request:</span> /nextmatch/VCT</div>
+                        <div class="res"><span>Response:</span> Następny mecz na "VCT" to: Team A vs Team B za 2h 30m (2025-01-15 18:00)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="api-card">
+                <h2 class="api-title">📅 Dzienne Mecze</h2>
+                <p class="api-description">Pobierz wszystkie dzisiejsze mecze dla określonego wydarzenia e-sportowego. Dane pobierane z VLR.gg.</p>
+                <div class="api-endpoint">GET /dailymatches/{event}</div>
+                
+                <div class="details-section">
+                    <h3 class="details-title">Parametry</h3>
+                    <ul class="param-list"><li>event: Nazwa wydarzenia (np. VCT, EMEA)</li></ul>
+                </div>
+                
+                <div class="details-section">
+                    <h3 class="details-title">Przykład</h3>
+                    <div class="example-block">
+                        <div class="req"><span>Request:</span> /dailymatches/VCT</div>
+                        <div class="res"><span>Response:</span> Dzisiejsze mecze VCT International: 14:00 Team A vs Team B | 17:00 Team C vs Team D</div>
                     </div>
                 </div>
             </div>
@@ -130,7 +198,7 @@
             </div>
             <div class="api-card">
                 <h2 class="api-title">🩺 Health Check</h2>
-                <p class="api-description">Zwraca status techniczny API. Służy do monitorowania działania serwisu. Zwraca kod 200, jeśli wszystko działa, lub 503, jeśli występuje problem (np. brak połączenia z API Henrika).</p>
+                <p class="api-description">Zwraca status techniczny API. Służy do monitorowania działania serwisu. Zwraca kod 200, jeśli wszystko działa, lub 503, jeśli występuje problem.</p>
                 <div class="api-endpoint">GET /health</div>
                 
                 
@@ -153,6 +221,20 @@
                     <div class="example-block">
                         <div class="req"><span>Request:</span> /status</div>
                         <div class="res"><span>Response:</span> Zwraca stronę HTML z paskami statusu...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="api-card">
+                <h2 class="api-title">📚 Dokumentacja API</h2>
+                <p class="api-description">Interaktywna dokumentacja Swagger UI z pełnym opisem wszystkich endpointów API.</p>
+                <div class="api-endpoint">GET /api-docs</div>
+                
+                
+                <div class="details-section">
+                    <h3 class="details-title">Przykład</h3>
+                    <div class="example-block">
+                        <div class="req"><span>Request:</span> /api-docs</div>
+                        <div class="res"><span>Response:</span> Zwraca stronę Swagger UI...</div>
                     </div>
                 </div>
             </div></div>
