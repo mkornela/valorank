@@ -4,14 +4,12 @@ const log = require('../utils/logger');
 const { logToDiscord } = require('../utils/discord');
 const NodeCache = require('node-cache');
 
-// Initialize cache with TTL from configuration
 const cache = new NodeCache({ 
   stdTTL: config.CACHE_TTL_SECONDS,
-  checkperiod: 60, // Check for expired items every minute
-  useClones: false // Better performance
+  checkperiod: 60,
+  useClones: false
 });
 
-// Cache statistics
 const cacheStats = {
   hits: 0,
   misses: 0,
@@ -19,9 +17,6 @@ const cacheStats = {
   deletes: 0
 };
 
-/**
- * Custom API error class
- */
 class APIError extends Error {
   constructor(message, statusCode = 500, details = {}) {
     super(message);
@@ -34,9 +29,6 @@ class APIError extends Error {
 
 let fetch;
 
-/**
- * Initialize fetch dynamically
- */
 async function initFetch() {
   if (typeof globalThis.fetch === 'undefined') {
     const module = await import('node-fetch');
@@ -46,9 +38,6 @@ async function initFetch() {
   }
 }
 
-/**
- * Generate cache key for API requests
- */
 function generateCacheKey(urlPath, queryParams = {}) {
   const sortedParams = Object.keys(queryParams)
     .sort()
@@ -57,12 +46,8 @@ function generateCacheKey(urlPath, queryParams = {}) {
   return `${urlPath}${sortedParams ? '?' + sortedParams : ''}`;
 }
 
-/**
- * Get data from cache or fetch and cache it
- */
 async function getWithCache(key, fetchFunction, ttl = config.CACHE_TTL_SECONDS) {
   try {
-    // Check cache first
     const cachedData = cache.get(key);
     if (cachedData) {
       cacheStats.hits++;
@@ -70,12 +55,10 @@ async function getWithCache(key, fetchFunction, ttl = config.CACHE_TTL_SECONDS) 
       return cachedData;
     }
     
-    // Fetch fresh data
     cacheStats.misses++;
     log.debug('CACHE', `Cache miss for key: ${key.substring(0, 50)}...`);
     const freshData = await fetchFunction();
     
-    // Cache the result
     cache.set(key, freshData, ttl);
     cacheStats.sets++;
     
@@ -86,9 +69,6 @@ async function getWithCache(key, fetchFunction, ttl = config.CACHE_TTL_SECONDS) 
   }
 }
 
-/**
- * Fetch data from HenrikDev API with enhanced error handling
- */
 async function fetchFromHenrikApi(urlPath, queryParams = {}) {
   if (!fetch) await initFetch();
   
@@ -100,7 +80,6 @@ async function fetchFromHenrikApi(urlPath, queryParams = {}) {
     fullUrl += `?${searchParams.toString()}`; 
   }
   
-  // Generate cache key
   const cacheKey = generateCacheKey(urlPath, queryParams);
   
   return getWithCache(cacheKey, async () => {
@@ -159,9 +138,6 @@ async function fetchFromHenrikApi(urlPath, queryParams = {}) {
   });
 }
 
-/**
- * Helper function to deduplicate matches by match ID
- */
 function deduplicateMatches(matches) {
   if (!Array.isArray(matches)) {
     return matches;
@@ -170,16 +146,15 @@ function deduplicateMatches(matches) {
   const seen = new Set();
   const uniqueMatches = matches.filter(match => {
     const matchId = match.metadata?.match_id || match.meta?.matchid;
-    if (!matchId) return true; // Keep matches without ID (shouldn't happen but safe)
+    if (!matchId) return true;
     
     if (seen.has(matchId)) {
-      return false; // Skip duplicate
+      return false;
     }
     seen.add(matchId);
     return true;
   });
   
-  // Log if duplicates were found
   if (uniqueMatches.length < matches.length) {
     const duplicateCount = matches.length - uniqueMatches.length;
     log.info('DEDUP', `Removed ${duplicateCount} duplicate matches from API response`);
@@ -188,9 +163,6 @@ function deduplicateMatches(matches) {
   return uniqueMatches;
 }
 
-/**
- * Fetch account details with caching
- */
 async function fetchAccountDetails(name, tag) { 
   const validationError = validatePlayerInput(name, tag);
   if (validationError) {
@@ -200,9 +172,6 @@ async function fetchAccountDetails(name, tag) {
   return fetchFromHenrikApi(`/valorant/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`); 
 }
 
-/**
- * Fetch player MMR with caching
- */
 async function fetchPlayerMMR(name, tag, region) { 
   const validationError = validatePlayerInput(name, tag, region);
   if (validationError) {
@@ -212,9 +181,6 @@ async function fetchPlayerMMR(name, tag, region) {
   return fetchFromHenrikApi(`/valorant/v2/mmr/${region.toLowerCase()}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`); 
 }
 
-/**
- * Fetch MMR history for daily stats (v2 endpoint)
- */
 async function fetchMMRHistoryDaily(name, tag, region) {
   const validationError = validatePlayerInput(name, tag, region);
   if (validationError) {
@@ -225,9 +191,6 @@ async function fetchMMRHistoryDaily(name, tag, region) {
   return fetchFromHenrikApi(`/valorant/v2/mmr-history/${region.toLowerCase()}/${platform}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`);
 }
 
-/**
- * Fetch MMR history for session stats (v1 endpoint)
- */
 async function fetchMMRHistory(name, tag, region) {
   const validationError = validatePlayerInput(name, tag, region);
   if (validationError) {
@@ -237,9 +200,6 @@ async function fetchMMRHistory(name, tag, region) {
   return fetchFromHenrikApi(`/valorant/v1/mmr-history/${region.toLowerCase()}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`);
 }
 
-/**
- * Fetch match history with pagination support
- */
 async function fetchMatchHistory(name, tag, region, gameMode = 'competitive', totalSize = 25) {
   const validationError = validatePlayerInput(name, tag, region);
   if (validationError) {
@@ -276,7 +236,6 @@ async function fetchMatchHistory(name, tag, region, gameMode = 'competitive', to
       } 
     }
     
-    // Deduplicate matches before sorting
     allMatches = deduplicateMatches(allMatches);
     
     allMatches.sort((a, b) => new Date(b.metadata.game_start_iso).getTime() - new Date(a.metadata.game_start_iso).getTime());
@@ -289,9 +248,6 @@ async function fetchMatchHistory(name, tag, region, gameMode = 'competitive', to
   }
 }
 
-/**
- * Fetch leaderboard data
- */
 async function fetchLeaderboard(region) {
   const validRegions = ['na', 'eu', 'ap', 'kr', 'latam', 'br'];
   if (!validRegions.includes(region.toLowerCase())) {
@@ -302,9 +258,6 @@ async function fetchLeaderboard(region) {
   return fetchFromHenrikApi(`/valorant/v3/leaderboard/${region.toLowerCase()}/pc`);
 }
 
-/**
- * Check API status
- */
 async function checkApiStatus(region = 'eu') {
   try {
     const data = await fetchFromHenrikApi(`/valorant/v1/version/${region}`);
@@ -315,11 +268,7 @@ async function checkApiStatus(region = 'eu') {
   }
 }
 
-/**
- * Validate player input parameters
- */
 function validatePlayerInput(name, tag, region = null) {
-  // Decode URL-encoded characters (like %20 for space)
   const decodedName = decodeURIComponent(name);
   
   if (!decodedName || typeof decodedName !== 'string' || decodedName.length < 3 || decodedName.length > 16) {
@@ -330,16 +279,11 @@ function validatePlayerInput(name, tag, region = null) {
     return 'Player tag must be between 3 and 5 characters';
   }
   
-  // Validate name format - allow letters, numbers, spaces, underscores, hyphens, and common special characters
-  // Based on VALORANT naming conventions
   if (!/^[\p{L}\p{N}_\-\s\.]+$/u.test(decodedName)) {
     return 'Player name contains invalid characters';
   } 
 }
 
-/**
- * Get cache statistics
- */
 function getCacheStats() {
   const stats = cache.getStats();
   return {
@@ -352,9 +296,6 @@ function getCacheStats() {
   };
 }
 
-/**
- * Clear cache
- */
 function clearCache() {
   cache.flushAll();
   cacheStats.deletes++;

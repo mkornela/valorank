@@ -1,6 +1,3 @@
-/**
- * Valorant rank tiers mapping
- */
 const RANK_TIERS = {
     0: "Unranked", 
     3: "Iron 1", 4: "Iron 2", 5: "Iron 3",
@@ -14,24 +11,12 @@ const RANK_TIERS = {
     27: "Radiant"
 };
 
-/**
- * Valid regions for Valorant API
- */
 const VALID_REGIONS = ['na', 'eu', 'ap', 'kr', 'latam', 'br'];
 
-/**
- * Base threshold for Radiant rank
- */
 const RADIANT_BASE_THRESHOLD = 550;
 
-/**
- * Maximum matches per API request
- */
 const MAX_MATCHES_PER_REQUEST = 10;
 
-/**
- * Team abbreviations mapping
- */
 const TEAMS = {
     'BBL Esports': 'BBL',
     'FNATIC': 'FNC',
@@ -47,17 +32,11 @@ const TEAMS = {
     'Apeks': 'APEKS'
 };
 
-/**
- * Event names mapping
- */
 const EVENTS = {
     'VCT 2025: EMEA Stage 2': 'VCT EMEA Stage 2',
     'VCT 2025: Americas Stage 2': 'VCT Americas Stage 2'
 };
 
-/**
- * Rank ELO thresholds for progression calculation
- */
 const RANK_ELO_THRESHOLDS = {
     'Iron 1': 0,
     'Iron 2': 100,
@@ -86,9 +65,6 @@ const RANK_ELO_THRESHOLDS = {
     'Radiant': 2650
 };
 
-/**
- * Game modes supported by the API
- */
 const GAME_MODES = {
     COMPETITIVE: 'competitive',
     UNRATED: 'unrated',
@@ -99,17 +75,11 @@ const GAME_MODES = {
     CUSTOM: 'custom'
 };
 
-/**
- * Platform types
- */
 const PLATFORMS = {
     PC: 'pc',
     CONSOLE: 'console'
 };
 
-/**
- * API response status codes
- */
 const API_STATUS = {
     SUCCESS: 200,
     CREATED: 201,
@@ -122,9 +92,6 @@ const API_STATUS = {
     SERVICE_UNAVAILABLE: 503
 };
 
-/**
- * Error messages
- */
 const ERROR_MESSAGES = {
     INVALID_PLAYER_NAME: 'Player name must be between 3 and 16 characters and contain only letters, numbers, and underscores',
     INVALID_PLAYER_TAG: 'Player tag must be between 3 and 5 characters and contain only letters and numbers',
@@ -138,9 +105,6 @@ const ERROR_MESSAGES = {
     INVALID_SESSION_TIME: 'Invalid session time parameters'
 };
 
-/**
- * Time constants (in milliseconds)
- */
 const TIME_CONSTANTS = {
     MINUTE: 60 * 1000,
     HOUR: 60 * 60 * 1000,
@@ -148,9 +112,6 @@ const TIME_CONSTANTS = {
     WEEK: 7 * 24 * 60 * 60 * 1000
 };
 
-/**
- * Cache keys prefixes
- */
 const CACHE_KEYS = {
     PLAYER_MMR: 'player_mmr',
     PLAYER_ACCOUNT: 'player_account',
@@ -159,9 +120,6 @@ const CACHE_KEYS = {
     LEADERBOARD: 'leaderboard'
 };
 
-/**
- * Validation patterns
- */
 const VALIDATION_PATTERNS = {
     PLAYER_NAME: /^[\p{L}\p{N}_\-\s\.]{3,16}$/u,
     PLAYER_TAG: /^[a-zA-Z0-9]{3,5}$/,

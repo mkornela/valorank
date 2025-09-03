@@ -6,7 +6,6 @@ const { fetchFromHenrikApi, initFetch } = require('../src/services/api');
 const config = require('../src/config');
 const { MAX_MATCHES_PER_REQUEST } = require('../src/constants');
 
-// Torad specific configuration
 const TORAD_PLAYER_NAME = 'TIER 2 DEMON';
 const TORAD_PLAYER_TAG = 'TIER1';
 const TORAD_PLAYER_REGION = config.STATS_PLAYER_REGION || 'eu';

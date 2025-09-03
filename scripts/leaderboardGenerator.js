@@ -24,7 +24,6 @@ class RateLimiter {
     async waitIfNeeded() {
         const now = Date.now();
         
-        // Wymuś minimum 100ms między requestami
         const timeSinceLastRequest = now - this.lastRequestTime;
         if (timeSinceLastRequest < MIN_DELAY_BETWEEN_REQUESTS) {
             const waitTime = MIN_DELAY_BETWEEN_REQUESTS - timeSinceLastRequest;
@@ -32,36 +31,30 @@ class RateLimiter {
             await new Promise(resolve => setTimeout(resolve, waitTime));
         }
         
-        // Reset licznika sekund
         if (now - this.currentSecondStart >= 1000) {
             this.requestsInCurrentSecond = 0;
             this.currentSecondStart = now;
         }
         
-        // Reset licznika 2 minut
         if (now - this.current2MinutesStart >= 2 * 60 * 1000) {
             this.requestsInCurrent2Minutes = 0;
             this.current2MinutesStart = now;
         }
         
-        // Sprawdź limit na sekundę (BEZPIECZNIE)
         if (this.requestsInCurrentSecond >= SAFE_REQUESTS_PER_SECOND) {
-            const waitTime = 1000 - (now - this.currentSecondStart) + 50; // +50ms buffer
+            const waitTime = 1000 - (now - this.currentSecondStart) + 50;
             console.log(`⚠️  Approaching rate limit per second. Waiting ${waitTime}ms for safety...`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
             
-            // Reset po odczekaniu
             this.requestsInCurrentSecond = 0;
             this.currentSecondStart = Date.now();
         }
         
-        // Sprawdź limit na 2 minuty (BEZPIECZNIE)
         if (this.requestsInCurrent2Minutes >= SAFE_REQUESTS_PER_2_MINUTES) {
-            const waitTime = 2 * 60 * 1000 - (now - this.current2MinutesStart) + 1000; // +1s buffer
+            const waitTime = 2 * 60 * 1000 - (now - this.current2MinutesStart) + 1000;
             console.log(`⚠️  Approaching rate limit per 2 minutes. Waiting ${Math.round(waitTime/1000)}s for safety...`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
             
-            // Reset po odczekaniu
             this.requestsInCurrent2Minutes = 0;
             this.current2MinutesStart = Date.now();
         }
@@ -145,7 +138,6 @@ async function fetchAllPlayers() {
                 
                 console.log(`✓ Fetched ${playersToAdd.length} players. Total: ${allPlayers.length}/${TARGET_PLAYERS}`);
                 
-                // Jeśli osiągnęliśmy cel, przerwij
                 if (allPlayers.length >= TARGET_PLAYERS) {
                     break;
                 }
@@ -154,15 +146,13 @@ async function fetchAllPlayers() {
                 break;
             }
             
-            // Dodatkowe opóźnienie między requestami dla bezpieczeństwa
             if (i < totalRequests - 1) {
-                await new Promise(resolve => setTimeout(resolve, 200)); // 200ms zamiast 100ms
+                await new Promise(resolve => setTimeout(resolve, 200));
             }
             
         } catch (error) {
             console.error(`Error in request ${i + 1}: ${error.message}`);
             
-            // W przypadku błędu, poczekaj trochę dłużej przed kolejną próbą
             if (error.message.includes('429') || error.message.includes('rate limit')) {
                 console.log('Rate limit error detected. Waiting 60 seconds...');
                 await new Promise(resolve => setTimeout(resolve, 60000));
@@ -171,7 +161,6 @@ async function fetchAllPlayers() {
                 await new Promise(resolve => setTimeout(resolve, 5000));
             }
             
-            // Spróbuj ponownie ten sam request
             i--;
         }
     }
@@ -193,7 +182,6 @@ async function main() {
             }
         };
         
-        // Zapisz do pliku
         fs.writeFileSync(OUTPUT_FILE, JSON.stringify(result, null, 2));
         
         console.log('');
@@ -206,11 +194,9 @@ async function main() {
     }
 }
 
-// Obsługa Ctrl+C
 process.on('SIGINT', () => {
     console.log('\n⚠️  Process interrupted. Exiting gracefully...');
     process.exit(0);
 });
 
-// Uruchom skrypt
 main();

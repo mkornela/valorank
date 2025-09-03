@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const apiEndpoints = require('../src/config/docs'); // Importujemy tę samą konfigurację
+const apiEndpoints = require('../src/config/docs');
 
 function generateDocsHTML() {
     let cardsHtml = '';
@@ -98,5 +98,4 @@ function generateDocsHTML() {
     }
 }
 
-// Uruchomienie funkcji, aby można było ją wywołać z package.json
 generateDocsHTML();

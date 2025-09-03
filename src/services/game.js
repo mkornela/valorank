@@ -1,12 +1,6 @@
 const { RANK_TIERS, RADIANT_BASE_THRESHOLD } = require('../constants');
 const log = require('../utils/logger');
 
-/**
- * Calculate RR needed to reach next rank
- * @param {number} currentTier - Current tier ID
- * @param {number} currentRR - Current RR in tier
- * @returns {Object} Object containing RR needed and goal rank
- */
 function calculateRRToGoal(currentTier, currentRR) {
     if (currentTier === 27) { 
         return { rr: 0, goal: "Radiant!" }; 
@@ -22,15 +16,6 @@ function calculateRRToGoal(currentTier, currentRR) {
     return { rr: rrToNext, goal: nextGoalRank };
 }
 
-/**
- * Calculate session statistics from match history
- * @param {Object} matchHistory - Match history data
- * @param {Array} mmrHistory - MMR history data
- * @param {string} playerPUUID - Player's PUUID
- * @param {Date} startTime - Session start time
- * @param {Date} endTime - Session end time
- * @returns {Object} Session statistics
- */
 function calculateSessionStats(matchHistoryData, mmrHistoryArray, playerPuuid, sessionStartTime, sessionEndTime) {
    let wins = 0, losses = 0, draws = 0, totalRRChange = 0, latestMap = null, lastMatchResult = null, lastMatchRR = null;
    
@@ -98,13 +83,6 @@ function calculateSessionStats(matchHistoryData, mmrHistoryArray, playerPuuid, s
    return { wins, losses, draws, totalRRChange, latestMap, lastMatchResult, lastMatchRR };
 }
 
-/**
- * Calculate win rate
- * @param {number} wins - Number of wins
- * @param {number} losses - Number of losses
- * @param {number} draws - Number of draws (optional)
- * @returns {number} Win rate percentage
- */
 function calculateWinRate(wins, losses, draws = 0) {
     const totalMatches = wins + losses + draws;
     if (totalMatches === 0) return 0;
@@ -112,12 +90,6 @@ function calculateWinRate(wins, losses, draws = 0) {
     return Math.round((wins / totalMatches) * 100);
 }
 
-/**
- * Calculate performance metrics
- * @param {Object} matchHistory - Match history data
- * @param {string} playerPUUID - Player's PUUID
- * @returns {Object} Performance metrics
- */
 function calculatePerformanceMetrics(matchHistory, playerPUUID) {
     if (!matchHistory || !matchHistory.data || !Array.isArray(matchHistory.data)) {
         return {
@@ -187,11 +159,6 @@ function calculatePerformanceMetrics(matchHistory, playerPUUID) {
     };
 }
 
-/**
- * Get rank progression data
- * @param {Array} mmrHistory - MMR history data
- * @returns {Object} Rank progression data
- */
 function getRankProgression(mmrHistory) {
     if (!mmrHistory || !Array.isArray(mmrHistory)) {
         return {
@@ -221,11 +188,9 @@ function getRankProgression(mmrHistory) {
             timestamp: new Date(entry.date || entry.timestamp).getTime()
         });
 
-        // Track rank changes
         if (lastTier !== null && tier !== lastTier) {
             rankChanges++;
             
-            // Update streak
             if (tier > lastTier) {
                 currentStreak++;
                 bestStreak = Math.max(bestStreak, currentStreak);
@@ -245,12 +210,6 @@ function getRankProgression(mmrHistory) {
     };
 }
 
-/**
- * Calculate session summary
- * @param {Object} sessionStats - Session statistics
- * @param {Object} performanceMetrics - Performance metrics
- * @returns {Object} Session summary
- */
 function calculateSessionSummary(sessionStats, performanceMetrics) {
     const { wins, losses, draws } = sessionStats;
     const totalMatches = wins + losses + draws;

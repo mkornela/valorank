@@ -1,13 +1,7 @@
 const log = require('../utils/logger');
 
-/**
- * Load leaderboard data from JSON file
- */
 let leaderboardData = null;
 
-/**
- * Initialize leaderboard data
- */
 function initLeaderboard() {
   try {
     const fs = require('fs');
@@ -29,14 +23,8 @@ function initLeaderboard() {
   }
 }
 
-// Initialize on module load
 initLeaderboard();
 
-/**
- * Find player by rank position
- * @param {number} position - Leaderboard position
- * @returns {Object|null} Player data or null if not found
- */
 function findPlayerByRank(position) {
   if (!leaderboardData || !leaderboardData.data || !Array.isArray(leaderboardData.data.players)) {
     log.warn('LEADERBOARD', 'Leaderboard data not available');
@@ -53,12 +41,6 @@ function findPlayerByRank(position) {
   return player;
 }
 
-/**
- * Find player by name and tag
- * @param {string} name - Player name
- * @param {string} tag - Player tag
- * @returns {Object|null} Player data or null if not found
- */
 function findPlayerByNameTag(name, tag) {
   if (!leaderboardData || !leaderboardData.data || !Array.isArray(leaderboardData.data.players)) {
     log.warn('LEADERBOARD', 'Leaderboard data not available');
@@ -77,12 +59,6 @@ function findPlayerByNameTag(name, tag) {
   return player;
 }
 
-/**
- * Get players in rank range
- * @param {number} start - Starting rank
- * @param {number} end - Ending rank
- * @returns {Array} Array of players in range
- */
 function getPlayersInRange(start, end) {
   if (!leaderboardData || !leaderboardData.data || !Array.isArray(leaderboardData.data.players)) {
     log.warn('LEADERBOARD', 'Leaderboard data not available');
@@ -94,10 +70,6 @@ function getPlayersInRange(start, end) {
     .sort((a, b) => a.leaderboardRank - b.leaderboardRank);
 }
 
-/**
- * Get leaderboard statistics
- * @returns {Object} Statistics about the leaderboard
- */
 function getLeaderboardStats() {
   if (!leaderboardData || !leaderboardData.data || !Array.isArray(leaderboardData.data.players)) {
     return {
@@ -127,7 +99,6 @@ function getLeaderboardStats() {
   const maxRR = Math.max(...rrValues);
   const minRR = Math.min(...rrValues);
 
-  // Region distribution (if available)
   const regionDistribution = players.reduce((acc, p) => {
     const region = p.region || 'unknown';
     acc[region] = (acc[region] || 0) + 1;
@@ -143,20 +114,11 @@ function getLeaderboardStats() {
   };
 }
 
-/**
- * Reload leaderboard data from file
- */
 function reloadLeaderboard() {
   log.info('LEADERBOARD', 'Reloading leaderboard data');
   initLeaderboard();
 }
 
-/**
- * Search players by name (partial match)
- * @param {string} searchTerm - Search term
- * @param {number} limit - Maximum results
- * @returns {Array} Array of matching players
- */
 function searchPlayers(searchTerm, limit = 10) {
   if (!leaderboardData || !leaderboardData.data || !Array.isArray(leaderboardData.data.players)) {
     return [];

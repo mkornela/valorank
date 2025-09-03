@@ -85,9 +85,8 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
     }
 
-    const [mmr, /*leaderboard,*/ account, rawHistory, mmrHistory] = await Promise.all([
+    const [mmr, account, rawHistory, mmrHistory] = await Promise.all([
         fetchPlayerMMR(name, tag, region),
-        //fetchLeaderboard(region),
         fetchAccountDetails(name, tag),
         fetchMatchHistory(name, tag, region, 'competitive', 25),
         fetchMMRHistoryDaily(name, tag, region)
@@ -150,12 +149,7 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     const lastStats = `${lastStatsRaw.stats.kills}/${lastStatsRaw.stats.deaths}/${lastStatsRaw.stats.assists}`;
     const lastAgent = lastStatsRaw.agent.name;
 
-    //let playerLB = await findPlayer(leaderboard.data.players, name, tag);
-    //if(playerLB != 'Not found') {
-    //    playerLB = `#${playerLB.leaderboard_rank}`;
-    //} else {
-        playerLB = ``;
-    //}
+    playerLB = ``;
     
     let finalText = text
         .replace(/{name}/g, name)
