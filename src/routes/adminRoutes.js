@@ -2,7 +2,6 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const log = require('../utils/logger');
-const config = require('../config');
 
 const router = express.Router();
 
@@ -31,8 +30,8 @@ router.get('/test', (req, res) => {
 function requireAdminAuth(req, res, next) {
     const { username, password } = req.body || {};
     
-    const adminUsername = config.ADMIN_USERNAME;
-    const adminPassword = config.ADMIN_PASSWORD;
+    const adminUsername = process.env.ADMIN_USERNAME;
+    const adminPassword = process.env.ADMIN_PASSWORD;
     
     if (username === adminUsername && password === adminPassword) {
         next();
