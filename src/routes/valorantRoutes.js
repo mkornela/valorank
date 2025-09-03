@@ -7,6 +7,9 @@ const { fetchAccountDetails, fetchMatchHistory, fetchPlayerMMR, fetchLeaderboard
 const { findPlayerByRank } = require('../data/leaderboard');
 const { calculateRRToGoal, calculateSessionStats } = require('../services/game');
 const log = require('../utils/logger');
+const { validateRegion, validatePosition, validatePlayerData, validateAccountExists, validateMMRExists } = require('../middleware/validation');
+const { sendSuccessResponse, sendErrorResponse, sendInfoResponse, formatWinLossString, formatRRChange } = require('../utils/responseHelper');
+const { generateKey, get, set } = require('../utils/cache');
 
 const { VlrClient } = require('vlr-client');
 const vlr = new VlrClient();
@@ -77,12 +80,22 @@ function findPlayer(leaderboard, name, tag) {
     return player;
 }
 
-router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
+router.get('/rank/:name/:tag/:region', validateRegion, asyncHandler(async (req, res, next) => {
     const { name, tag, region } = req.params;
     const { text = "{rank} {rr}RR | Daily: {wl} ({dailyRR}RR) | Last: {lastRR}RR", resetTime, goalRank } = req.query;
 
-    if (!VALID_REGIONS.includes(region.toLowerCase())) {
-        return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
+    const cacheKey = generateKey('rank', name, tag, region, goalRank);
+    const cachedResult = get(cacheKey);
+    if (cachedResult) {
+        return sendSuccessResponse(res, cachedResult, {
+            title: 'API Call Success: `/rank` (cached)',
+            fields: [
+                { name: 'Player', value: `\`${name}#${tag}\``, inline: true },
+                { name: 'Custom Goal', value: goalRank ? `\`${goalRank}\`` : 'Default (next rank)', inline: true },
+                { name: 'Result', value: `\`${cachedResult}\``, inline: false }
+            ],
+            ip: req.ip
+        });
     }
 
     const [mmr, account, rawHistory, mmrHistory] = await Promise.all([
@@ -91,27 +104,17 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         fetchMatchHistory(name, tag, region, 'competitive', 25),
         fetchMMRHistoryDaily(name, tag, region)
     ]);
-    console.log({
-        mmr,
-        account,
-        rawHistory,
-        mmrHistory
-    })
 
-    let lastStatsRaw;
-    rawHistory.data[0].players.forEach(player => {
-        if(player.name == name) lastStatsRaw = player;
-    })
-
-    if (!mmr.data || !mmr.data.current_data) {
-        return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza lub brak danych rankingowych.');
-    }
-    if (!account.data?.puuid) {
-        return res.status(404).type('text/plain').send('Błąd: Nie znaleziono konta gracza dla statystyk dziennych.');
+    const validation = validatePlayerData(mmr, account);
+    if (!validation.valid) {
+        return sendErrorResponse(res, validation.message, 404, {
+            title: 'API Call Error: `/rank`',
+            fields: [{ name: 'Player', value: `\`${name}#${tag}\``, inline: true }],
+            ip: req.ip
+        });
     }
 
     const history = deduplicateMatches(rawHistory);
-
     const { currenttier, ranking_in_tier, elo } = mmr.data.current_data;
     
     let rr, goal, rrToGoal;
@@ -119,7 +122,11 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     if (goalRank) {
         const customGoal = calculateEloToCustomGoal(elo, goalRank);
         if (customGoal === null) {
-            return res.status(400).type('text/plain').send(`Błąd: Nieprawidłowa nazwa rangi "${goalRank}". Dostępne rangi: ${Object.keys(RANK_ELO_THRESHOLDS).join(', ')}`);
+            return sendErrorResponse(res, `Błąd: Nieprawidłowa nazwa rangi "${goalRank}". Dostępne rangi: ${Object.keys(RANK_ELO_THRESHOLDS).join(', ')}`, 400, {
+                title: 'API Call Error: `/rank`',
+                fields: [{ name: 'Player', value: `\`${name}#${tag}\``, inline: true }],
+                ip: req.ip
+            });
         }
         
         rrToGoal = customGoal.eloNeeded;
@@ -139,17 +146,23 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
 
     const { startTime, endTime } = getSessionTimeRange(null, resetTime);
     const mmrHistoryArray = mmrHistory?.data?.history || [];
-
     let { wins, losses, draws, lastMatchRR, totalRRChange } = calculateSessionStats(history, mmrHistoryArray, account.data.puuid, startTime, endTime);
 
-    const wlString = draws > 0 ? `${wins}W/${draws}D/${losses}L` : `${wins}W/${losses}L`;
-    const dailyRRFormatted = totalRRChange >= 0 ? `+${totalRRChange}` : totalRRChange.toString();
-    const lastRRFormatted = lastMatchRR !== null ? (lastMatchRR >= 0 ? `+${lastMatchRR}` : lastMatchRR.toString()) : '-';
+    let lastStatsRaw;
+    if (rawHistory.data && rawHistory.data[0] && rawHistory.data[0].players) {
+        rawHistory.data[0].players.forEach(player => {
+            if (player.name == name) lastStatsRaw = player;
+        });
+    }
 
-    const lastStats = `${lastStatsRaw.stats.kills}/${lastStatsRaw.stats.deaths}/${lastStatsRaw.stats.assists}`;
-    const lastAgent = lastStatsRaw.agent.name;
+    const wlString = formatWinLossString(wins, losses, draws);
+    const dailyRRFormatted = formatRRChange(totalRRChange);
+    const lastRRFormatted = lastMatchRR !== null ? formatRRChange(lastMatchRR) : '-';
 
-    playerLB = ``;
+    const lastStats = lastStatsRaw ? `${lastStatsRaw.stats.kills}/${lastStatsRaw.stats.deaths}/${lastStatsRaw.stats.assists}` : 'N/A';
+    const lastAgent = lastStatsRaw ? lastStatsRaw.agent.name : 'N/A';
+
+    const playerLB = '';
     
     let finalText = text
         .replace(/{name}/g, name)
@@ -173,53 +186,42 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     if (goalRank && rrToGoal === 0) {
         finalText = finalText.replace(/{rrToGoal}RR do {goal}/g, `Cel "${goalRank}" już osiągnięty!`);
     }
+
+    set(cacheKey, finalText, 60);
     
-    res.type('text/plain').send(finalText);
-    logToDiscord({ 
-        title: 'API Call Success: `/rank` (extended)', 
-        color: 0x00FF00, 
+    sendSuccessResponse(res, finalText, {
+        title: 'API Call Success: `/rank` (extended)',
         fields: [
-            { name: 'Player', value: `\`${name}#${tag}\``, inline: true }, 
+            { name: 'Player', value: `\`${name}#${tag}\``, inline: true },
             { name: 'Custom Goal', value: goalRank ? `\`${goalRank}\`` : 'Default (next rank)', inline: true },
             { name: 'Result', value: `\`${finalText}\``, inline: false }
-        ], 
-        timestamp: new Date().toISOString(), 
-        footer: { text: `IP: ${req.ip}` } 
+        ],
+        ip: req.ip
     });
 }));
 
-router.get('/rankraw/:name/:tag/:region', asyncHandler(async (req, res, next) => {
+router.get('/rankraw/:name/:tag/:region', validateRegion, asyncHandler(async (req, res, next) => {
     const { name, tag, region } = req.params;
-
-    if (!VALID_REGIONS.includes(region.toLowerCase())) {
-        return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
-    }
 
     const [mmr, account] = await Promise.all([
         fetchPlayerMMR(name, tag, region),
         fetchAccountDetails(name, tag)
     ]);
     
-    res.type('text/plain').send({ mmr, account });
-    logToDiscord({ 
-        title: 'API Call Success: `/rankraw` (extended)', 
-        color: 0x00FF00, 
+    const result = { mmr, account };
+    sendSuccessResponse(res, result, {
+        title: 'API Call Success: `/rankraw` (extended)',
         fields: [
-            { name: 'Player', value: `\`${name}#${tag}\``, inline: true }, 
-            { name: 'Result', value: `\`${ mmr, account }\``, inline: false }
-        ], 
-        timestamp: new Date().toISOString(), 
-        footer: { text: `IP: ${req.ip}` } 
+            { name: 'Player', value: `\`${name}#${tag}\``, inline: true },
+            { name: 'Result', value: `\`${JSON.stringify(result)}\``, inline: false }
+        ],
+        ip: req.ip
     });
 }));
 
-router.get('/wl/:name/:tag/:region', asyncHandler(async (req, res, next) => {
+router.get('/wl/:name/:tag/:region', validateRegion, asyncHandler(async (req, res, next) => {
     const { name, tag, region } = req.params;
     const { resetTime, sessionStart } = req.query;
-    
-    if (!VALID_REGIONS.includes(region.toLowerCase())) {
-        return res.status(400).type('text/plain').send('Błąd: Nieprawidłowy region.');
-    }
     
     const [account, rawHistory, mmrHistory] = await Promise.all([
         fetchAccountDetails(name, tag), 
@@ -227,8 +229,13 @@ router.get('/wl/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         fetchMMRHistory(name, tag, region)
     ]);
     
-    if (!account.data?.puuid) {
-        return res.status(404).type('text/plain').send('Błąd: Nie znaleziono gracza.');
+    const validation = validateAccountExists(account);
+    if (!validation.valid) {
+        return sendErrorResponse(res, validation.message, 404, {
+            title: 'API Call Error: `/wl`',
+            fields: [{ name: 'Player', value: `\`${name}#${tag}\``, inline: true }],
+            ip: req.ip
+        });
     }
     
     const history = deduplicateMatches(rawHistory);
@@ -237,9 +244,15 @@ router.get('/wl/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     const { startTime, endTime } = getSessionTimeRange(sessionStart ? parseInt(sessionStart, 10) * 1000 : null, resetTime);
     const { wins, losses, draws } = calculateSessionStats(history, mmrHistoryArray, account.data.puuid, startTime, endTime);
     
-    const result = draws > 0 ? `${wins}W/${draws}D/${losses}L` : `${wins}W/${losses}L`;
-    res.type('text/plain').send(result);
-    logToDiscord({ title: 'API Call Success: `/wl`', color: 0x00FF00, fields: [{ name: 'Player', value: `\`${name}#${tag}\``, inline: true }, { name: 'Result', value: `\`${result}\``, inline: false }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
+    const result = formatWinLossString(wins, losses, draws);
+    sendSuccessResponse(res, result, {
+        title: 'API Call Success: `/wl`',
+        fields: [
+            { name: 'Player', value: `\`${name}#${tag}\``, inline: true },
+            { name: 'Result', value: `\`${result}\``, inline: false }
+        ],
+        ip: req.ip
+    });
 }));
 
 router.get('/advanced_wl/:name/:tag/:region', asyncHandler(async (req, res, next) => {
@@ -318,20 +331,17 @@ router.get('/daily/:name/:tag/:region', asyncHandler(async (req, res, next) => {
     logToDiscord({ title: 'API Call Success: `/daily`', color: 0x00FF00, fields: [{ name: 'Player', value: `\`${name}#${tag}\`` }, { name: 'Result', value: `\`${responseText}\`` }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
 }));
 
-router.get('/getrank/:position', asyncHandler(async (req, res, next) => {
+router.get('/getrank/:position', validatePosition, asyncHandler(async (req, res, next) => {
     const { position } = req.params;
-    const rankPosition = parseInt(position, 10);
-
-    if (isNaN(rankPosition) || rankPosition <= 0) {
-        return res.status(400).type('text/plain').send('Błąd: Podano nieprawidłową pozycję.');
-    }
-    if (rankPosition > 15000) {
-        return res.type('text/plain').send(`Leaderboard VALORANT obsługuje tylko top 15000!`);
-    }
+    const rankPosition = req.rankPosition;
 
     const player = findPlayerByRank(rankPosition);
     if (!player) {
-        return res.status(404).type('text/plain').send(`Błąd: Ranga ${rankPosition} nie została znaleziona w tabeli wyników.`);
+        return sendErrorResponse(res, `Błąd: Ranga ${rankPosition} nie została znaleziona w tabeli wyników.`, 404, {
+            title: 'API Call Error: `/getrank`',
+            fields: [{ name: 'Position', value: `\`${rankPosition}\``, inline: true }],
+            ip: req.ip
+        });
     }
 
     const isAnonymized = !player.gameName;
@@ -339,8 +349,14 @@ router.get('/getrank/:position', asyncHandler(async (req, res, next) => {
         ? `Profil prywatny | Rating: ${player.rankedRating}RR | Wygrane: ${player.numberOfWins}`
         : `${player.gameName}#${player.tagLine} | Rating: ${player.rankedRating}RR | Wygrane: ${player.numberOfWins} | Tracker: https://tracker.gg/valorant/profile/riot/${encodeURIComponent(player.gameName)}%23${encodeURIComponent(player.tagLine)}/overview`;
     
-    res.type('text/plain').send(result);
-    logToDiscord({ title: 'API Call Success: `/getrank`', color: 0x00FF00, fields: [{ name: 'Position', value: `\`${rankPosition}\``, inline: true }, { name: 'Result', value: `\`${result}\``, inline: false }], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
+    sendSuccessResponse(res, result, {
+        title: 'API Call Success: `/getrank`',
+        fields: [
+            { name: 'Position', value: `\`${rankPosition}\``, inline: true },
+            { name: 'Result', value: `\`${result}\``, inline: false }
+        ],
+        ip: req.ip
+    });
 }));
 
 router.get('/nextmatch/:event', asyncHandler(async (req, res, next) => {
@@ -351,13 +367,10 @@ router.get('/nextmatch/:event', asyncHandler(async (req, res, next) => {
     );
     if (!nextMatch) {
         const result = `Nie znaleziono nadchodzących meczy dla wydarzenia: "${event}". Sprawdź, czy nazwa jest poprawna.`;
-        res.status(404).type('text/plain').send(result);
-        logToDiscord({ 
-            title: 'API Call Info: `/nextmatch` - Not Found', 
-            color: 0xFFA500,
-            fields: [{ name: 'Event Searched', value: `\`${event}\``, inline: true }], 
-            timestamp: new Date().toISOString(), 
-            footer: { text: `IP: ${req.ip}` } 
+        sendInfoResponse(res, result, {
+            title: 'API Call Info: `/nextmatch` - Not Found',
+            fields: [{ name: 'Event Searched', value: `\`${event}\``, inline: true }],
+            ip: req.ip
         });
         return;
     }
@@ -367,8 +380,14 @@ router.get('/nextmatch/:event', asyncHandler(async (req, res, next) => {
 
     const result = `Następny mecz na "${event}" to: ${nextMatch.teams[0].name} vs ${nextMatch.teams[1].name} za ${timeUntil} (${date})`;
 
-    res.type('text/plain').send(result);
-    logToDiscord({ title: 'API Call Success: `/nextmatch`', color: 0x00FF00, fields: [ { name: 'Event', value: `\`${event}\``, inline: true }, { name: 'Result', value: `\`${result}\``, inline: false } ], timestamp: new Date().toISOString(), footer: { text: `IP: ${req.ip}` } });
+    sendSuccessResponse(res, result, {
+        title: 'API Call Success: `/nextmatch`',
+        fields: [
+            { name: 'Event', value: `\`${event}\``, inline: true },
+            { name: 'Result', value: `\`${result}\``, inline: false }
+        ],
+        ip: req.ip
+    });
 
 }));
 
