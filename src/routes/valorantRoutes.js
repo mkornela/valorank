@@ -11,8 +11,7 @@ const { validateRegion, validatePosition, validatePlayerData, validateAccountExi
 const { sendSuccessResponse, sendErrorResponse, sendInfoResponse, formatWinLossString, formatRRChange } = require('../utils/responseHelper');
 const { generateKey, get, set } = require('../utils/cache');
 
-const { VlrClient } = require('vlr-client');
-const vlr = new VlrClient();
+const { getUpcomingMatches, getMatchDetails, getEvents, getEventMatches, searchPlayers } = require('../services/vlr');
 
 const asyncHandler = fn => (req, res, next) => {
     return Promise
@@ -361,7 +360,7 @@ router.get('/getrank/:position', validatePosition, asyncHandler(async (req, res,
 
 router.get('/nextmatch/:event', asyncHandler(async (req, res, next) => {
     const { event } = req.params;
-    const matches = await vlr.getUpcomingMatches();
+    const matches = await getUpcomingMatches();
     const nextMatch = matches.data.find(match => 
         match.event.name.toLowerCase() === event.toLowerCase()
     );
@@ -393,12 +392,12 @@ router.get('/nextmatch/:event', asyncHandler(async (req, res, next) => {
 
 router.get('/dailymatches/:event', asyncHandler(async (req, res, next) => {
     const { event } = req.params;
-    const matches = await vlr.getUpcomingMatches();
+    const matches = await getUpcomingMatches();
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const dailyMatches = matches.data.filter(match => {
+    const dailyMatches = matches.data?.filter(match => {
         if (!match.event?.name || !match.date) {
             return false;
         }
@@ -416,14 +415,11 @@ router.get('/dailymatches/:event', asyncHandler(async (req, res, next) => {
     });
 
     if (dailyMatches.length === 0) {
-        const result = `Nie znaleziono na dzisiaj żadnych meczy dla wydarzenia: "${EVENTS[event]}".`;
-        res.status(200).type('text/plain').send(result);
-        logToDiscord({
+        const result = `Nie znaleziono na dzisiaj żadnych meczy dla wydarzenia: "${EVENTS[event] || event}".`;
+        sendInfoResponse(res, result, {
             title: 'API Call Info: `/dailymatches` - Not Found',
-            color: 0xFFA500,
             fields: [{ name: 'Event Searched', value: `\`${event}\``, inline: true }],
-            timestamp: new Date().toISOString(),
-            footer: { text: `IP: ${req.ip}` }
+            ip: req.ip
         });
         return;
     }
@@ -441,18 +437,87 @@ router.get('/dailymatches/:event', asyncHandler(async (req, res, next) => {
         return `${time} ${teamA} vs ${teamB}`;
     });
 
-    const result = `Dzisiejsze mecze ${EVENTS[event]}: ${matchesStrings.join(' | ')}`;
+    const result = `Dzisiejsze mecze ${EVENTS[event] || event}: ${matchesStrings.join(' | ')}`;
 
-    res.type('text/plain').send(result);
-    logToDiscord({
+    sendSuccessResponse(res, result, {
         title: 'API Call Success: `/dailymatches`',
-        color: 0x00FF00,
         fields: [
             { name: 'Event', value: `\`${event}\``, inline: true },
             { name: 'Result', value: `\`${result}\``, inline: false }
         ],
-        timestamp: new Date().toISOString(),
-        footer: { text: `IP: ${req.ip}` }
+        ip: req.ip
+    });
+}));
+
+// Enhanced VLR Endpoints
+router.get('/vlr/match-details/:url', asyncHandler(async (req, res, next) => {
+    const { url } = req.params;
+    const fullUrl = decodeURIComponent(url);
+    
+    if (!fullUrl.startsWith(BASE_URL)) {
+        return sendErrorResponse(res, 'Invalid URL. Must be a VLR.gg URL.', 400, {
+            title: 'API Call Error: `/vlr/match-details`',
+            fields: [{ name: 'URL', value: `\`${fullUrl}\``, inline: true }],
+            ip: req.ip
+        });
+    }
+
+    const matchDetails = await getMatchDetails(fullUrl);
+    if (!matchDetails) {
+        return sendErrorResponse(res, 'Could not fetch match details.', 404, {
+            title: 'API Call Error: `/vlr/match-details`',
+            fields: [{ name: 'URL', value: `\`${fullUrl}\``, inline: true }],
+            ip: req.ip
+        });
+    }
+
+    sendSuccessResponse(res, matchDetails, {
+        title: 'API Call Success: `/vlr/match-details`',
+        fields: [
+            { name: 'Match', value: `${matchDetails.team1?.name || 'TBD'} vs ${matchDetails.team2?.name || 'TBD'}`, inline: true },
+            { name: 'Event', value: matchDetails.event?.name || 'N/A', inline: true }
+        ],
+        ip: req.ip
+    });
+}));
+
+router.get('/vlr/events', asyncHandler(async (req, res, next) => {
+    const events = await getEvents();
+    
+    sendSuccessResponse(res, events, {
+        title: 'API Call Success: `/vlr/events`',
+        fields: [
+            { name: 'Events Found', value: `\`${events.length}\``, inline: true }
+        ],
+        ip: req.ip
+    });
+}));
+
+router.get('/vlr/event-matches/:eventSlug', asyncHandler(async (req, res, next) => {
+    const { eventSlug } = req.params;
+    const matches = await getEventMatches(eventSlug);
+    
+    sendSuccessResponse(res, matches, {
+        title: 'API Call Success: `/vlr/event-matches`',
+        fields: [
+            { name: 'Event', value: `\`${eventSlug}\``, inline: true },
+            { name: 'Matches Found', value: `\`${matches.length}\``, inline: true }
+        ],
+        ip: req.ip
+    });
+}));
+
+router.get('/vlr/search-players/:query', asyncHandler(async (req, res, next) => {
+    const { query } = req.params;
+    const players = await searchPlayers(query);
+    
+    sendSuccessResponse(res, players, {
+        title: 'API Call Success: `/vlr/search-players`',
+        fields: [
+            { name: 'Query', value: `\`${query}\``, inline: true },
+            { name: 'Players Found', value: `\`${players.length}\``, inline: true }
+        ],
+        ip: req.ip
     });
 }));
 
