@@ -15,6 +15,12 @@ const config = {
   HENRIKDEV_API_KEY: process.env.HENRIKDEV_API_KEY,
   DISCORD_WEBHOOK_URL: process.env.DISCORD_WEBHOOK_URL,
   DISCORD_USER_ID_ON_ERROR: process.env.DISCORD_USER_ID_ON_ERROR,
+  DISCORD_LOG_INFO: process.env.DISCORD_LOG_INFO || 'false',
+  DISCORD_LOG_WARN: process.env.DISCORD_LOG_WARN || 'false',
+  DISCORD_LOG_DEBUG: process.env.DISCORD_LOG_DEBUG || 'false',
+  
+  ADMIN_USERNAME: process.env.ADMIN_USERNAME || 'admin',
+  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'admin123',
   
   STATS_PLAYER_NAME: process.env.STATS_PLAYER_NAME || "AGT DawcioAWP",
   STATS_PLAYER_TAG: process.env.STATS_PLAYER_TAG || "FCB",
@@ -81,6 +87,10 @@ const config = {
         warnings.push('API_SECRET_KEY should be changed in production');
       }
       
+      if (this.ADMIN_USERNAME === 'admin' && this.ADMIN_PASSWORD === 'admin123') {
+        warnings.push('Default admin credentials should be changed in production');
+      }
+      
       if (warnings.length > 0) {
         console.warn('⚠️  Production warnings:');
         warnings.forEach(warning => console.warn(`   - ${warning}`));
@@ -100,11 +110,17 @@ const config = {
     if (this.NODE_ENV === 'development') {
       baseConfig.LOG_LEVEL = 'debug';
       baseConfig.CACHE_TTL_SECONDS = 60;
+      baseConfig.DISCORD_LOG_INFO = 'true';
+      baseConfig.DISCORD_LOG_WARN = 'true';
+      baseConfig.DISCORD_LOG_DEBUG = 'true';
     }
     
     if (this.NODE_ENV === 'production') {
       baseConfig.LOG_LEVEL = 'warn';
       baseConfig.LOG_FILE_ENABLED = true;
+      baseConfig.DISCORD_LOG_INFO = 'false';
+      baseConfig.DISCORD_LOG_WARN = 'true';
+      baseConfig.DISCORD_LOG_DEBUG = 'false';
     }
     
     return baseConfig;

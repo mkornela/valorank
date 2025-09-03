@@ -1,7 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
 
 :root {
-    /* Color Palette */
     --bg-primary: #0f1419;
     --bg-secondary: #1a1f2e;
     --bg-tertiary: #252b3a;
@@ -33,7 +32,6 @@
     --shadow-color: rgba(0, 0, 0, 0.3);
     --shadow-elevated: 0 8px 32px var(--shadow-color);
     
-    /* Spacing */
     --spacing-xs: 4px;
     --spacing-sm: 8px;
     --spacing-md: 16px;
@@ -41,14 +39,12 @@
     --spacing-xl: 32px;
     --spacing-2xl: 48px;
     
-    /* Border Radius */
     --radius-sm: 4px;
     --radius-md: 8px;
     --radius-lg: 12px;
     --radius-xl: 16px;
     --radius-full: 50%;
     
-    /* Typography */
     --font-family-primary: 'Inter', sans-serif;
     --font-family-mono: 'JetBrains Mono', monospace;
     
@@ -70,17 +66,14 @@
     --line-height-normal: 1.5;
     --line-height-relaxed: 1.75;
     
-    /* Transitions */
     --transition-fast: 0.15s ease;
     --transition-normal: 0.3s ease;
     --transition-slow: 0.5s ease;
     
-    /* Container */
     --container-max-width: 1200px;
     --container-padding: 24px;
 }
 
-/* Base Styles */
 * {
     margin: 0;
     padding: 0;
@@ -102,7 +95,6 @@ body {
     padding: 0 var(--container-padding);
 }
 
-/* Typography */
 h1, h2, h3, h4, h5, h6 {
     font-weight: var(--font-weight-bold);
     line-height: var(--line-height-tight);
@@ -132,7 +124,6 @@ a:hover {
     text-decoration: underline;
 }
 
-/* Buttons */
 .btn {
     display: inline-flex;
     align-items: center;
@@ -171,7 +162,6 @@ a:hover {
     border-color: var(--accent-secondary);
 }
 
-/* Cards */
 .card {
     background-color: var(--bg-card);
     backdrop-filter: blur(10px);
@@ -206,7 +196,6 @@ a:hover {
     color: var(--text-secondary);
 }
 
-/* Forms */
 .input, .select, .textarea {
     width: 100%;
     padding: var(--spacing-sm) var(--spacing-md);
@@ -225,7 +214,6 @@ a:hover {
     box-shadow: 0 0 0 3px rgba(169, 112, 255, 0.1);
 }
 
-/* Utility Classes */
 .text-primary { color: var(--text-primary); }
 .text-secondary { color: var(--text-secondary); }
 .text-muted { color: var(--text-muted); }
@@ -260,7 +248,6 @@ a:hover {
 .p-lg { padding: var(--spacing-lg); }
 .p-xl { padding: var(--spacing-xl); }
 
-/* Animations */
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -328,7 +315,6 @@ a:hover {
     animation: gradient-animation 6s ease infinite;
 }
 
-/* Responsive Design */
 @media (max-width: 768px) {
     .container {
         padding: 0 var(--spacing-md);
@@ -343,7 +329,6 @@ a:hover {
     }
 }
 
-/* Loading States */
 .skeleton {
     background-color: var(--bg-tertiary);
     border-radius: var(--radius-md);
@@ -377,7 +362,6 @@ a:hover {
     margin-bottom: var(--spacing-lg);
 }
 
-/* Accessibility */
 .sr-only {
     position: absolute;
     width: 1px;

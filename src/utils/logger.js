@@ -2,6 +2,7 @@ const winston = require('winston');
 const path = require('path');
 const fs = require('fs');
 const config = require('../config');
+const { sendLogToDiscord } = require('./discord');
 
 const logDir = config.LOG_FILE_PATH;
 if (config.LOG_FILE_ENABLED && !fs.existsSync(logDir)) {
@@ -79,12 +80,24 @@ const addToBuffer = (level, module, message, meta = {}) => {
 const log = {
   info: (module, message, meta = {}) => {
     logger.info(message, { module, ...meta });
-    return addToBuffer('info', module, message, meta);
+    const logEntry = addToBuffer('info', module, message, meta);
+    
+    if (config.DISCORD_WEBHOOK_URL && config.DISCORD_LOG_INFO === 'true') {
+      sendLogToDiscord('info', message, logEntry.id, meta, module);
+    }
+    
+    return logEntry;
   },
   
   warn: (module, message, meta = {}) => {
     logger.warn(message, { module, ...meta });
-    return addToBuffer('warn', module, message, meta);
+    const logEntry = addToBuffer('warn', module, message, meta);
+    
+    if (config.DISCORD_WEBHOOK_URL && config.DISCORD_LOG_WARN === 'true') {
+      sendLogToDiscord('warn', message, logEntry.id, meta, module);
+    }
+    
+    return logEntry;
   },
   
   error: (module, message, error = null, meta = {}) => {
@@ -100,12 +113,24 @@ const log = {
     };
     
     logger.error(message, { module, ...errorMeta });
-    return addToBuffer('error', module, message, errorMeta);
+    const logEntry = addToBuffer('error', module, message, errorMeta);
+    
+    if (config.DISCORD_WEBHOOK_URL) {
+      sendLogToDiscord('error', message, logEntry.id, errorMeta, module);
+    }
+    
+    return logEntry;
   },
   
   debug: (module, message, meta = {}) => {
     logger.debug(message, { module, ...meta });
-    return addToBuffer('debug', module, message, meta);
+    const logEntry = addToBuffer('debug', module, message, meta);
+    
+    if (config.DISCORD_WEBHOOK_URL && config.DISCORD_LOG_DEBUG === 'true') {
+      sendLogToDiscord('debug', message, logEntry.id, meta, module);
+    }
+    
+    return logEntry;
   },
 
   getAllLogs: (limit = null) => {
@@ -201,6 +226,10 @@ const log = {
     }
     
     return metrics;
+  },
+
+  getLogById: (id) => {
+    return logsBuffer.find(log => log.id === id);
   }
 };
 

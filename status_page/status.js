@@ -110,7 +110,6 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.backButton.style.display = 'block';
         elements.timelinePeriod.style.display = 'none';
         
-        // Zmieniamy tekst nagłówka na datę
         document.querySelector('.timeline-header .section-title').textContent = `Szczegółowy status: ${formatDate(dateString)}`;
 
         const todayDateString = new Date().toISOString().split('T')[0];
