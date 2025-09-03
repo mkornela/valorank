@@ -103,11 +103,11 @@ router.get('/display', (req, res) => {
     }
 });
 
-router.get('/health', async (req, res) => { // Endpoint jest teraz asynchroniczny
+router.get('/health', async (req, res) => {
     try {
         const statsFileExists = fs.existsSync(path.join(process.cwd(), 'valorant_stats.html'));
         const docsFileExists = fs.existsSync(path.join(process.cwd(), 'docs.html'));
-        const apiStatus = await checkApiStatus(); // Sprawdzamy status API
+        const apiStatus = await checkApiStatus();
 
         const uptimeSeconds = process.uptime();
         const hours = Math.floor(uptimeSeconds / 3600);
@@ -156,9 +156,6 @@ router.get('/health', async (req, res) => { // Endpoint jest teraz asynchroniczn
     }
 });
 
-//REQUIRED BY RIOT FOR ME TO OBTAIN THEIR API KEY
-//REQUIRED BY RIOT FOR ME TO OBTAIN THEIR API KEY
-//REQUIRED BY RIOT FOR ME TO OBTAIN THEIR API KEY
 router.get('/riot.txt', (req, res) => {
     const riotFilePath = path.join(process.cwd(), 'riot.txt');
     

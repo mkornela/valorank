@@ -20,12 +20,12 @@ const asyncHandler = fn => (req, res, next) => {
 const calculateEloToCustomGoal = (currentElo, goalRank) => {
     const goalElo = RANK_ELO_THRESHOLDS[goalRank];
     if (goalElo === undefined) {
-        return null; // Nieprawidłowa nazwa rangi
+        return null;
     }
     
     const eloNeeded = goalElo - currentElo;
     return {
-        eloNeeded: Math.max(0, eloNeeded), // Nie może być ujemne
+        eloNeeded: Math.max(0, eloNeeded),
         goalElo: goalElo,
         alreadyReached: eloNeeded <= 0
     };
@@ -176,7 +176,6 @@ router.get('/rank/:name/:tag/:region', asyncHandler(async (req, res, next) => {
         finalText = finalText.replace(/{rrToGoal}RR do {goal}/g, "Gratulacje Radianta!");
     }
     
-    // Jeśli cel został już osiągnięty, zastąp komunikat
     if (goalRank && rrToGoal === 0) {
         finalText = finalText.replace(/{rrToGoal}RR do {goal}/g, `Cel "${goalRank}" już osiągnięty!`);
     }

@@ -9,14 +9,12 @@ const config = require('./config/index');
 const log = require('./utils/logger');
 const { logToDiscord } = require('./utils/discord');
 
-// Security middleware
 const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
 
-// Security configurations
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -28,7 +26,6 @@ app.use(helmet({
   },
 }));
 
-// CORS configuration
 const corsOptions = {
   origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:3000'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -37,10 +34,9 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: {
     error: 'Too many requests from this IP, please try again later.',
     retryAfter: '900'
@@ -50,10 +46,9 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// Stricter rate limiting for sensitive endpoints
 const strictLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 20, // limit each IP to 20 requests per hour
+  windowMs: 60 * 60 * 1000,
+  max: 20,
   message: {
     error: 'Rate limit exceeded for this endpoint. Please try again later.',
     retryAfter: '3600'
@@ -61,29 +56,23 @@ const strictLimiter = rateLimit({
 });
 app.use('/rank/', strictLimiter);
 
-// Body parsing middleware
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// View engine setup
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '..', 'views'));
 
-// Static files
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use(express.static(path.join(__dirname, '..', 'status_page')));
 app.use(express.static(path.join(__dirname, '..', 'admin')));
 
-// Trust proxy for proper IP logging
 app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
 
-// Request logging middleware
 app.use((req, res, next) => {
   log.info('REQUEST', `${req.method} ${req.originalUrl} - IP: ${req.ip}`);
   next();
 });
 
-// Health check endpoint
 app.get('/health', (req, res) => {
   let version = 'unknown';
   try {
@@ -103,7 +92,6 @@ app.get('/health', (req, res) => {
   res.json(health);
 });
 
-// API documentation
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
@@ -132,7 +120,6 @@ const options = {
 const specs = swaggerJsdoc(options);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
-// Route handlers
 app.use('/', appRoutes);
 app.use('/', valorantRoutes);
 app.use('/admin', adminRoutes);
@@ -168,7 +155,6 @@ async function recordApiStatus() {
             const fileContent = await fs.readFile(filePath, 'utf-8');
             dayData = JSON.parse(fileContent);
         } catch (error) {
-            // File doesn't exist, will be created
         }
         
         dayData[timeString] = { 
@@ -194,11 +180,9 @@ async function recordApiStatus() {
     }
 }
 
-// Start status recording
 recordApiStatus();
 setInterval(recordApiStatus, 60 * 1000);
 
-// 404 handler
 app.use((req, res) => {
     log.warn('NOT_FOUND', `${req.method} ${req.originalUrl} - IP: ${req.ip}`);
     res.status(404).json({
@@ -208,11 +192,9 @@ app.use((req, res) => {
     });
 });
 
-// Global error handler
 app.use((err, req, res, next) => {
     log.error('FATAL', `Unhandled error on ${req.method} ${req.originalUrl}`, err);
     
-    // Log to Discord for critical errors
     logToDiscord({
         title: '🔴 Critical Server Error',
         color: 0xFF0000,
@@ -238,7 +220,6 @@ app.use((err, req, res, next) => {
     res.status(500).json(errorResponse);
 });
 
-// Graceful shutdown
 process.on('SIGTERM', () => {
     log.info('SHUTDOWN', 'SIGTERM received, shutting down gracefully');
     process.exit(0);

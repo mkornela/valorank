@@ -2,7 +2,6 @@ const app = require('./src/app');
 const config = require('./src/config');
 const log = require('./src/utils/logger');
 
-// Start the server
 const server = app.listen(config.PORT, () => {
   log.info('SERVER', `Valorank Enhanced server running on port ${config.PORT}`);
   log.info('SERVER', `Environment: ${config.NODE_ENV}`);
@@ -10,7 +9,6 @@ const server = app.listen(config.PORT, () => {
   log.info('SERVER', `API documentation available at: http://localhost:${config.PORT}/api-docs`);
 });
 
-// Handle server errors
 server.on('error', (error) => {
   if (error.code === 'EADDRINUSE') {
     log.error('SERVER', `Port ${config.PORT} is already in use`);
@@ -20,7 +18,6 @@ server.on('error', (error) => {
   }
 });
 
-// Graceful shutdown
 process.on('SIGTERM', () => {
   log.info('SHUTDOWN', 'SIGTERM received, shutting down gracefully');
   server.close(() => {
