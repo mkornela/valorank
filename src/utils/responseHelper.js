@@ -12,24 +12,23 @@ const sendSuccessResponse = (res, data, discordConfig = null) => {
             footer: { text: `IP: ${discordConfig.ip || 'unknown'}` }
         }, false, logEntry);
     }
-    // Remove extra response formatting and extract rank
-    const cleanedData = {
-      success: data.success,
-      data: data.data ? {
-          rank: extractRank(data.data.rank),
-          ...data.data
-      } : null,
-      message: data.message ? data.message : null,
-      timestamp: new Date().toISOString()
+    // Normalize output: always { success: true, data, timestamp }
+    const normalize = (payload) => {
+        // If payload already follows our shape, return as-is
+        if (payload && typeof payload === 'object' && ('success' in payload || 'data' in payload)) {
+            return payload;
+        }
+        return { data: payload };
     };
-    
-    function extractRank(text) {
-        const rankMatch = text.match(/([A-Za-z]+) (\d+)(?:RR|rr)/);
-        return rankMatch ? rankMatch[1] : text;
-    }
-    
-    console.log('sendSuccessResponse', cleanedData);
-    res.json(cleanedData);
+
+    const body = {
+        success: true,
+        ...normalize(data),
+        timestamp: new Date().toISOString()
+    };
+
+    console.log('sendSuccessResponse', body);
+    res.json(body);
 };
 
 const sendErrorResponse = (res, message, status = 404, discordConfig = null) => {

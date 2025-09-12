@@ -363,10 +363,13 @@ router.get('/nextmatch/:event', asyncHandler(async (req, res, next) => {
     const { event } = req.params;
     const matches = await getUpcomingMatches();
 
+    const normalizeEvent = (s) => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const targetEvent = normalizeEvent(event);
+
     // Filter: matching event name AND strictly future start time
     const matching = (matches.data || [])
         .filter(match => match?.event?.name && match?.date && match?.time)
-        .filter(match => match.event.name.toLowerCase() === event.toLowerCase())
+        .filter(match => normalizeEvent(match.event.name) === targetEvent)
         .filter(match => isMatchInFuture(match.date, match.time));
 
     // Pick earliest upcoming by parsed start time
