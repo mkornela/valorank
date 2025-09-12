@@ -73,17 +73,26 @@ const config = {
     if (!validRegions.includes(this.STATS_PLAYER_REGION)) {
       errors.push(`STATS_PLAYER_REGION must be one of: ${validRegions.join(', ')}`);
     }
-    
+
     if (this.NODE_ENV === 'production') {
-      const warnings = [];
-      
-      if (this.API_SECRET_KEY === 'default-secret-key-change-in-production') {
-        warnings.push('API_SECRET_KEY should be changed in production');
+      if (!process.env.SESSION_SECRET) {
+        errors.push('SESSION_SECRET is required in production');
       }
-      
-      if (warnings.length > 0) {
-        console.warn('⚠️  Production warnings:');
-        warnings.forEach(warning => console.warn(`   - ${warning}`));
+      if (!process.env.ADMIN_USERNAME) {
+        errors.push('ADMIN_USERNAME is required in production');
+      }
+      if (!process.env.ADMIN_PASSWORD) {
+        errors.push('ADMIN_PASSWORD is required in production');
+      }
+      if (this.API_SECRET_KEY === 'default-secret-key-change-in-production') {
+        errors.push('API_SECRET_KEY must be changed in production');
+      }
+    } else {
+      if (!process.env.SESSION_SECRET) {
+        console.warn('⚠️  SESSION_SECRET is not set. Using default session secret for development.');
+      }
+      if (!process.env.ADMIN_USERNAME || !process.env.ADMIN_PASSWORD) {
+        console.warn('⚠️  ADMIN_USERNAME or ADMIN_PASSWORD not set. Admin routes may not be accessible.');
       }
     }
     

@@ -1,7 +1,11 @@
 const winston = require('winston');
 const path = require('path');
 const fs = require('fs');
+const EventEmitter = require('events');
 const config = require('../config');
+
+class LogEmitter extends EventEmitter {}
+const logEmitter = new LogEmitter();
 
 const logDir = config.LOG_FILE_PATH;
 if (config.LOG_FILE_ENABLED && !fs.existsSync(logDir)) {
@@ -73,6 +77,7 @@ const addToBuffer = (level, module, message, meta = {}) => {
     logsBuffer = logsBuffer.slice(0, MAX_LOGS);
   }
 
+  logEmitter.emit('newLog', logEntry);
   return logEntry;
 };
 
@@ -201,6 +206,14 @@ const log = {
     }
     
     return metrics;
+  },
+
+  onNewLog: (listener) => {
+    logEmitter.on('newLog', listener);
+  },
+  
+  removeLogListener: (listener) => {
+    logEmitter.off('newLog', listener);
   }
 };
 

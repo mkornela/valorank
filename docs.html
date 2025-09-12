@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pl">
 <head>
@@ -8,50 +7,277 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" />
     <style>
-        :root { --purple-glow: #a970ff; --cyan-glow: #50d7e8; --bg-dark: #111827; --bg-card: #171E2D; --border-color: rgba(255, 255, 255, 0.1); --text-primary: #f9fafb; --text-secondary: #9ca3af; --red: #f87171; --green: #4ade80; }
+        :root {
+            --purple-glow: #a970ff;
+            --cyan-glow: #50d7e8;
+            --bg-dark: #111827;
+            --bg-card: #171E2D;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --text-primary: #f9fafb;
+            --text-secondary: #9ca3af;
+            --red: #f87171;
+            --green: #4ade80;
+            --sidebar-width: 260px;
+        }
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family: 'Inter', sans-serif; background-color: var(--bg-dark); color: var(--text-primary); min-height: 100vh; padding: 20px; }
-        .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
-        .header { text-align: center; margin-bottom: 40px; padding: 20px; }
-        .header h1 { font-size: 2.5rem; font-weight: 700; background: linear-gradient(90deg, var(--purple-glow), var(--cyan-glow)); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .header p { font-size: 1.1rem; color: var(--text-secondary); margin-top: 8px; }
-        .api-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
-        .api-card { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 25px; }
-        .api-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary); }
-        .api-description { color: var(--text-secondary); line-height: 1.6; font-size: 0.95rem; margin-bottom: 16px; }
-        .api-endpoint { font-family: 'JetBrains Mono', monospace; background-color: #0c1017; padding: 12px; border-radius: 6px; color: var(--cyan-glow); border-left: 2px solid var(--cyan-glow); margin: 20px 0; font-size: 0.9rem; user-select: all; word-break: break-all; }
-        .details-section { margin-top: 20px; }
-        .details-title { font-weight: 600; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 10px; }
-        .param-list { list-style: none; }
-        .param-list li { font-family: 'JetBrains Mono', monospace; background-color: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 4px; font-size: 0.85rem; color: #ccc; margin-bottom: 6px; }
-        .example-block { font-family: 'JetBrains Mono', monospace; background-color: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 6px; font-size: 0.85rem; color: #ccc; }
-        .example-block div { margin-bottom: 5px; }
-        .example-block span { font-weight: 600; }
-        .example-block .req span { color: var(--red); }
-        .example-block .res span { color: var(--green); }
-        .footer { text-align: center; margin-top: 50px; padding: 20px; color: #6b7280; font-size: .9rem; }
-        a { color: var(--cyan-glow); text-decoration: none; }
-        a:hover { text-decoration: underline; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+        }
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-card);
+            border-right: 1px solid var(--border-color);
+            padding: 30px 20px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        .sidebar h2 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 18px;
+            color: var(--purple-glow);
+        }
+        .sidebar nav {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .sidebar nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 1rem;
+            padding: 8px 0;
+            border-radius: 4px;
+            transition: background .2s, color .2s;
+        }
+        .sidebar nav a.active, .sidebar nav a:hover {
+            background: var(--purple-glow);
+            color: #fff;
+        }
+        .search-bar {
+            margin-top: 10px;
+        }
+        .search-bar input {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            background: #181e2d;
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+        .main-content {
+            flex: 1;
+            padding: 40px 40px 40px 0;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: left;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--purple-glow), var(--cyan-glow));
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+        .api-section {
+            margin-bottom: 40px;
+        }
+        .api-section.collapsible {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+        }
+        .api-section .section-header {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            gap: 10px;
+        }
+        .api-section .section-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+        .api-section .section-header .fa-chevron-down {
+            transition: transform .2s;
+        }
+        .api-section.collapsed .section-header .fa-chevron-down {
+            transform: rotate(-90deg);
+        }
+        .api-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .api-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--purple-glow);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .api-description {
+            color: var(--text-secondary);
+            line-height: 1.6;
+            font-size: 0.95rem;
+            margin-bottom: 16px;
+        }
+        .api-endpoint {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: #0c1017;
+            padding: 12px;
+            border-radius: 6px;
+            color: var(--cyan-glow);
+            border-left: 2px solid var(--cyan-glow);
+            margin: 20px 0;
+            font-size: 0.9rem;
+            user-select: all;
+            word-break: break-all;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .copy-btn {
+            background: none;
+            border: none;
+            color: var(--cyan-glow);
+            cursor: pointer;
+            font-size: 1.1rem;
+            margin-left: 8px;
+        }
+        .details-section {
+            margin-top: 20px;
+        }
+        .details-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+        .param-list {
+            list-style: none;
+        }
+        .param-list li {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: rgba(0,0,0,0.2);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: #ccc;
+            margin-bottom: 6px;
+        }
+        .example-block {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: #ccc;
+        }
+        .example-block div {
+            margin-bottom: 5px;
+        }
+        .example-block span {
+            font-weight: 600;
+        }
+        .example-block .req span {
+            color: var(--red);
+        }
+        .example-block .res span {
+            color: var(--green);
+        }
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 20px;
+            color: #6b7280;
+            font-size: .9rem;
+        }
+        a {
+            color: var(--cyan-glow);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        @media (max-width: 900px) {
+            body { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; position: static; border-right: none; border-bottom: 1px solid var(--border-color); }
+            .main-content { padding: 20px; }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
+    <aside class="sidebar">
+        <h2><i class="fa-solid fa-book"></i> API Docs</h2>
+        <nav>
+            <a href="#tracker" class="active">Tracker W/L</a>
+            <a href="#advancedwl">Zaawansowane W/L</a>
+            <a href="#rank">Informacje o Randze</a>
+            <a href="#daily">Dzienne Statystyki</a>
+            <a href="#rankraw">Surowe Dane Rankingu</a>
+            <a href="#getrank">Wyszukiwanie w Tabeli</a>
+            <a href="#nextmatch">Nadchodzące Mecze</a>
+            <a href="#dailymatches">Dzienne Mecze</a>
+            <a href="#statystyki">Strona ze Statystykami</a>
+            <a href="#health">Health Check</a>
+            <a href="#status">Strona Statusu API</a>
+            <a href="#api-docs">Swagger UI</a>
+        </nav>
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="Szukaj endpointu..." />
+        </div>
+    </aside>
+    <main class="main-content">
         <div class="header">
             <h1>Dokumentacja API</h1>
             <p>Statystyki VALORANT w czasie rzeczywistym</p>
         </div>
-        <div class="api-grid">
+        <!-- Example collapsible section for endpoints -->
+        <section class="api-section collapsible" id="tracker">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2><i class="fa-solid fa-trophy"></i> Tracker Wygranych/Przegranych</h2>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
             <div class="api-card">
-                <h2 class="api-title">🏆 Tracker Wygranych/Przegranych</h2>
-                <p class="api-description">Śledź swoje dzienne wygrane i przegrane w trybie rankingowym. Zwraca prosty format pokazujący wyniki sesji.</p>
-                <div class="api-endpoint">GET /wl/{name}/{tag}/{region}</div>
-                
+                <div class="api-title"><i class="fa-solid fa-trophy"></i> /wl/{name}/{tag}/{region}</div>
+                <div class="api-description">Śledź swoje dzienne wygrane i przegrane w trybie rankingowym. Zwraca prosty format pokazujący wyniki sesji.</div>
+                <div class="api-endpoint">GET /wl/{name}/{tag}/{region} <button class="copy-btn" onclick="copyEndpoint('/wl/{name}/{tag}/{region}')"><i class="fa-regular fa-copy"></i></button></div>
                 <div class="details-section">
                     <h3 class="details-title">Parametry</h3>
-                    <ul class="param-list"><li>?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)</li><li>?sessionStart=timestamp - Własny początek sesji (w sekundach unix)</li></ul>
+                    <ul class="param-list">
+                        <li>?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)</li>
+                        <li>?sessionStart=timestamp - Własny początek sesji (w sekundach unix)</li>
+                    </ul>
                 </div>
-                
                 <div class="details-section">
                     <h3 class="details-title">Przykład</h3>
                     <div class="example-block">
@@ -60,34 +286,48 @@
                     </div>
                 </div>
             </div>
+        </section>
+        <section class="api-section collapsible" id="advancedwl">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2><i class="fa-solid fa-chart-line"></i> Zaawansowane W/L</h2>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
             <div class="api-card">
-                <h2 class="api-title">📊 Zaawansowane W/L</h2>
-                <p class="api-description">Rozszerzone śledzenie W/L z detalami ostatniego meczu, w tym zmiany RR i wynik.</p>
-                <div class="api-endpoint">GET /advanced_wl/{name}/{tag}/{region}</div>
-                
+                <div class="api-title"><i class="fa-solid fa-chart-line"></i> /advanced_wl/{name}/{tag}/{region}</div>
+                <div class="api-description">Rozszerzone śledzenie W/L z detalami ostatniego meczu, w tym zmiany RR i wynik.</div>
+                <div class="api-endpoint">GET /advanced_wl/{name}/{tag}/{region} <button class="copy-btn" onclick="copyEndpoint('/advanced_wl/{name}/{tag}/{region}')"><i class="fa-regular fa-copy"></i></button></div>
                 <div class="details-section">
                     <h3 class="details-title">Parametry</h3>
-                    <ul class="param-list"><li>?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)</li></ul>
+                    <ul class="param-list">
+                        <li>?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)</li>
+                    </ul>
                 </div>
-                
                 <div class="details-section">
                     <h3 class="details-title">Przykład</h3>
                     <div class="example-block">
-                        <div class="req"><span>Request:</span> /advanced_wl/Szalony/123/eu</div>
                         <div class="res"><span>Response:</span> 3W/1L (Ostatni: W +23RR)</div>
                     </div>
                 </div>
             </div>
+        </section>
+        <section class="api-section collapsible" id="rank">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2><i class="fa-solid fa-medal"></i> Informacje o Randze (Rozszerzone)</h2>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
             <div class="api-card">
-                <h2 class="api-title">🎖️ Informacje o Randze (Rozszerzone)</h2>
-                <p class="api-description">Pobierz aktualną rangę, RR i postęp do następnej rangi. Endpoint został połączony z funkcjonalnością dziennych statystyk, dzięki czemu możesz dołączyć do odpowiedzi bilans wygranych/przegranych, dzienną zmianę RR, zmianę RR z ostatniego meczu, a także statystyki (K/D/A) i agenta z ostatniej gry.</p>
-                <div class="api-endpoint">GET /rank/{name}/{tag}/{region}</div>
-                
+                <div class="api-title"><i class="fa-solid fa-medal"></i> /rank/{name}/{tag}/{region}</div>
+                <div class="api-description">Pobierz aktualną rangę, RR i postęp do następnej rangi. Endpoint został połączony z funkcjonalnością dziennych statystyk, dzięki czemu możesz dołączyć do odpowiedzi bilans wygranych/przegranych, dzienną zmianę RR, zmianę RR z ostatniego meczu, a także statystyki (K/D/A) i agenta z ostatniej gry.</div>
+                <div class="api-endpoint">GET /rank/{name}/{tag}/{region} <button class="copy-btn" onclick="copyEndpoint('/rank/{name}/{tag}/{region}')"><i class="fa-regular fa-copy"></i></button></div>
                 <div class="details-section">
                     <h3 class="details-title">Parametry</h3>
-                    <ul class="param-list"><li>?text="{rank} ({rr} RR) | Ostatnia gra: {lastStats} jako {lastAgent}"</li><li>Dostępne zmienne: {name}, {tag}, {lb}, {rank}, {rr}, {rrToGoal}, {goal}, {wl}, {dailyRR}, {lastRR}, {lastStats}, {lastAgent}</li><li>?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)</li><li>?goalRank=RANK - Własny cel rangi (np. Immortal)</li></ul>
+                    <ul class="param-list">
+                        <li>?text="{rank} ({rr} RR) | Ostatnia gra: {lastStats} jako {lastAgent}"</li>
+                        <li>Dostępne zmienne: {name}, {tag}, {lb}, {rank}, {rr}, {rrToGoal}, {goal}, {wl}, {dailyRR}, {lastRR}, {lastStats}, {lastAgent}</li>
+                        <li>?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)</li>
+                        <li>?goalRank=RANK - Własny cel rangi (np. Immortal)</li>
+                    </ul>
                 </div>
-                
                 <div class="details-section">
                     <h3 class="details-title">Przykład</h3>
                     <div class="example-block">
@@ -96,16 +336,22 @@
                     </div>
                 </div>
             </div>
+        </section>
+        <section class="api-section collapsible" id="daily">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2><i class="fa-solid fa-calendar-day"></i> Dzienne Statystyki</h2>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
             <div class="api-card">
-                <h2 class="api-title">📅 Dzienne Statystyki</h2>
-                <p class="api-description">Zwraca podsumowanie dzisiejszych statystyk gracza włącznie z rangą, bilansem W/L i zmianą RR.</p>
-                <div class="api-endpoint">GET /daily/{name}/{tag}/{region}</div>
-                
+                <div class="api-title"><i class="fa-solid fa-calendar-day"></i> /daily/{name}/{tag}/{region}</div>
+                <div class="api-description">Zwraca podsumowanie dzisiejszych statystyk gracza włącznie z rangą, bilansem W/L i zmianą RR.</div>
+                <div class="api-endpoint">GET /daily/{name}/{tag}/{region} <button class="copy-btn" onclick="copyEndpoint('/daily/{name}/{tag}/{region}')"><i class="fa-regular fa-copy"></i></button></div>
                 <div class="details-section">
                     <h3 class="details-title">Parametry</h3>
-                    <ul class="param-list"><li>?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)</li></ul>
+                    <ul class="param-list">
+                        <li>?resetTime=HHMM - Własny czas dziennego resetu (np. 0800)</li>
+                    </ul>
                 </div>
-                
                 <div class="details-section">
                     <h3 class="details-title">Przykład</h3>
                     <div class="example-block">
@@ -114,12 +360,16 @@
                     </div>
                 </div>
             </div>
+        </section>
+        <section class="api-section collapsible" id="rankraw">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2><i class="fa-solid fa-database"></i> Surowe Dane Rankingu</h2>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
             <div class="api-card">
-                <h2 class="api-title">🔍 Surowe Dane Rankingu</h2>
-                <p class="api-description">Zwraca surowe dane API dotyczące gracza bez formatowania. Przydatne do debugowania i integracji.</p>
-                <div class="api-endpoint">GET /rankraw/{name}/{tag}/{region}</div>
-                
-                
+                <div class="api-title"><i class="fa-solid fa-database"></i> /rankraw/{name}/{tag}/{region}</div>
+                <div class="api-description">Zwraca surowe dane API dotyczące gracza bez formatowania. Przydatne do debugowania i integracji.</div>
+                <div class="api-endpoint">GET /rankraw/{name}/{tag}/{region} <button class="copy-btn" onclick="copyEndpoint('/rankraw/{name}/{tag}/{region}')"><i class="fa-regular fa-copy"></i></button></div>
                 <div class="details-section">
                     <h3 class="details-title">Przykład</h3>
                     <div class="example-block">
@@ -128,16 +378,22 @@
                     </div>
                 </div>
             </div>
+        </section>
+        <section class="api-section collapsible" id="getrank">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2><i class="fa-solid fa-list-ol"></i> Wyszukiwanie w Tabeli Wyników</h2>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
             <div class="api-card">
-                <h2 class="api-title">🏅 Wyszukiwanie w Tabeli Wyników</h2>
-                <p class="api-description">Wyszukaj graczy po ich pozycji w tabeli wyników (top 15000). Pokazuje rating, wygrane i link do trackera. Dane pochodzą ze statycznego pliku.</p>
-                <div class="api-endpoint">GET /getrank/{position}</div>
-                
+                <div class="api-title"><i class="fa-solid fa-list-ol"></i> /getrank/{position}</div>
+                <div class="api-description">Wyszukaj graczy po ich pozycji w tabeli wyników (top 15000). Pokazuje rating, wygrane i link do trackera. Dane pochodzą ze statycznego pliku.</div>
+                <div class="api-endpoint">GET /getrank/{position} <button class="copy-btn" onclick="copyEndpoint('/getrank/{position}')"><i class="fa-regular fa-copy"></i></button></div>
                 <div class="details-section">
                     <h3 class="details-title">Parametry</h3>
-                    <ul class="param-list"><li>position: 1-15000 (pozycja w tabeli)</li></ul>
+                    <ul class="param-list">
+                        <li>position: 1-15000 (pozycja w tabeli)</li>
+                    </ul>
                 </div>
-                
                 <div class="details-section">
                     <h3 class="details-title">Przykład</h3>
                     <div class="example-block">
@@ -146,16 +402,22 @@
                     </div>
                 </div>
             </div>
+        </section>
+        <section class="api-section collapsible" id="nextmatch">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2><i class="fa-solid fa-clock"></i> Nadchodzące Mecze</h2>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
             <div class="api-card">
-                <h2 class="api-title">🔮 Nadchodzące Mecze</h2>
-                <p class="api-description">Znajdź następny mecz dla określonego wydarzenia e-sportowego. Dane pobierane z VLR.gg.</p>
-                <div class="api-endpoint">GET /nextmatch/{event}</div>
-                
+                <div class="api-title"><i class="fa-solid fa-clock"></i> /nextmatch/{event}</div>
+                <div class="api-description">Znajdź następny mecz dla określonego wydarzenia e-sportowego. Dane pobierane z VLR.gg.</div>
+                <div class="api-endpoint">GET /nextmatch/{event} <button class="copy-btn" onclick="copyEndpoint('/nextmatch/{event}')"><i class="fa-regular fa-copy"></i></button></div>
                 <div class="details-section">
                     <h3 class="details-title">Parametry</h3>
-                    <ul class="param-list"><li>event: Nazwa wydarzenia (np. VCT, EMEA)</li></ul>
+                    <ul class="param-list">
+                        <li>event: Nazwa wydarzenia (np. VCT, EMEA)</li>
+                    </ul>
                 </div>
-                
                 <div class="details-section">
                     <h3 class="details-title">Przykład</h3>
                     <div class="example-block">
@@ -164,16 +426,22 @@
                     </div>
                 </div>
             </div>
+        </section>
+        <section class="api-section collapsible" id="dailymatches">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2><i class="fa-solid fa-calendar-alt"></i> Dzienne Mecze</h2>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
             <div class="api-card">
-                <h2 class="api-title">📅 Dzienne Mecze</h2>
-                <p class="api-description">Pobierz wszystkie dzisiejsze mecze dla określonego wydarzenia e-sportowego. Dane pobierane z VLR.gg.</p>
-                <div class="api-endpoint">GET /dailymatches/{event}</div>
-                
+                <div class="api-title"><i class="fa-solid fa-calendar-alt"></i> /dailymatches/{event}</div>
+                <div class="api-description">Pobierz wszystkie dzisiejsze mecze dla określonego wydarzenia e-sportowego. Dane pobierane z VLR.gg.</div>
+                <div class="api-endpoint">GET /dailymatches/{event} <button class="copy-btn" onclick="copyEndpoint('/dailymatches/{event}')"><i class="fa-regular fa-copy"></i></button></div>
                 <div class="details-section">
                     <h3 class="details-title">Parametry</h3>
-                    <ul class="param-list"><li>event: Nazwa wydarzenia (np. VCT, EMEA)</li></ul>
+                    <ul class="param-list">
+                        <li>event: Nazwa wydarzenia (np. VCT, EMEA)</li>
+                    </ul>
                 </div>
-                
                 <div class="details-section">
                     <h3 class="details-title">Przykład</h3>
                     <div class="example-block">
@@ -182,12 +450,16 @@
                     </div>
                 </div>
             </div>
+        </section>
+        <section class="api-section collapsible" id="statystyki">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2><i class="fa-solid fa-chart-bar"></i> Strona ze Statystykami</h2>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
             <div class="api-card">
-                <h2 class="api-title">📈 Strona ze Statystykami</h2>
-                <p class="api-description">Zwraca w pełni renderowaną stronę HTML z zaawansowanymi, dziennymi statystykami dla głównego gracza skonfigurowanego w aplikacji.</p>
-                <div class="api-endpoint">GET /statystyki</div>
-                
-                
+                <div class="api-title"><i class="fa-solid fa-chart-bar"></i> /statystyki</div>
+                <div class="api-description">Zwraca w pełni renderowaną stronę HTML z zaawansowanymi, dziennymi statystykami dla głównego gracza skonfigurowanego w aplikacji.</div>
+                <div class="api-endpoint">GET /statystyki <button class="copy-btn" onclick="copyEndpoint('/statystyki')"><i class="fa-regular fa-copy"></i></button></div>
                 <div class="details-section">
                     <h3 class="details-title">Przykład</h3>
                     <div class="example-block">
@@ -196,12 +468,16 @@
                     </div>
                 </div>
             </div>
+        </section>
+        <section class="api-section collapsible" id="health">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2><i class="fa-solid fa-heartbeat"></i> Health Check</h2>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
             <div class="api-card">
-                <h2 class="api-title">🩺 Health Check</h2>
-                <p class="api-description">Zwraca status techniczny API. Służy do monitorowania działania serwisu. Zwraca kod 200, jeśli wszystko działa, lub 503, jeśli występuje problem.</p>
-                <div class="api-endpoint">GET /health</div>
-                
-                
+                <div class="api-title"><i class="fa-solid fa-heartbeat"></i> /health</div>
+                <div class="api-description">Zwraca status techniczny API. Służy do monitorowania działania serwisu. Zwraca kod 200, jeśli wszystko działa, lub 503, jeśli występuje problem.</div>
+                <div class="api-endpoint">GET /health <button class="copy-btn" onclick="copyEndpoint('/health')"><i class="fa-regular fa-copy"></i></button></div>
                 <div class="details-section">
                     <h3 class="details-title">Przykład</h3>
                     <div class="example-block">
@@ -210,12 +486,16 @@
                     </div>
                 </div>
             </div>
+        </section>
+        <section class="api-section collapsible" id="status">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2><i class="fa-solid fa-server"></i> Strona Statusu API</h2>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
             <div class="api-card">
-                <h2 class="api-title">🖥️ Strona Statusu API</h2>
-                <p class="api-description">Wyświetla przyjazną dla użytkownika stronę z wizualizacją dostępności API w ciągu ostatnich 90 dni.</p>
-                <div class="api-endpoint">GET /status</div>
-                
-                
+                <div class="api-title"><i class="fa-solid fa-server"></i> /status</div>
+                <div class="api-description">Wyświetla przyjazną dla użytkownika stronę z wizualizacją dostępności API w ciągu ostatnich 90 dni.</div>
+                <div class="api-endpoint">GET /status <button class="copy-btn" onclick="copyEndpoint('/status')"><i class="fa-regular fa-copy"></i></button></div>
                 <div class="details-section">
                     <h3 class="details-title">Przykład</h3>
                     <div class="example-block">
@@ -224,12 +504,16 @@
                     </div>
                 </div>
             </div>
+        </section>
+        <section class="api-section collapsible" id="api-docs">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2><i class="fa-solid fa-book-open"></i> Dokumentacja API</h2>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
             <div class="api-card">
-                <h2 class="api-title">📚 Dokumentacja API</h2>
-                <p class="api-description">Interaktywna dokumentacja Swagger UI z pełnym opisem wszystkich endpointów API.</p>
-                <div class="api-endpoint">GET /api-docs</div>
-                
-                
+                <div class="api-title"><i class="fa-solid fa-book-open"></i> /api-docs</div>
+                <div class="api-description">Interaktywna dokumentacja Swagger UI z pełnym opisem wszystkich endpointów API.</div>
+                <div class="api-endpoint">GET /api-docs <button class="copy-btn" onclick="copyEndpoint('/api-docs')"><i class="fa-regular fa-copy"></i></button></div>
                 <div class="details-section">
                     <h3 class="details-title">Przykład</h3>
                     <div class="example-block">
@@ -237,10 +521,33 @@
                         <div class="res"><span>Response:</span> Zwraca stronę Swagger UI...</div>
                     </div>
                 </div>
-            </div></div>
+            </div>
+        </section>
         <div class="footer">
             Stworzone z ❤️ przez <a href="https://github.com/mkornela">deemdll</a> • Zasilane przez HenrikDev API
         </div>
-    </div>
+    </main>
+    <script>
+        // Collapsible sections
+        function toggleSection(header) {
+            const section = header.parentElement;
+            section.classList.toggle('collapsed');
+        }
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            const val = e.target.value.toLowerCase();
+            document.querySelectorAll('.api-section').forEach(section => {
+                if (section.textContent.toLowerCase().includes(val)) {
+                    section.style.display = '';
+                } else {
+                    section.style.display = 'none';
+                }
+            });
+        });
+        // Copy endpoint
+        function copyEndpoint(text) {
+            navigator.clipboard.writeText(text);
+        }
+    </script>
 </body>
 </html>

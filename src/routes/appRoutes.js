@@ -5,6 +5,7 @@ const { checkApiStatus } = require('../services/api');
 const log = require('../utils/logger');
 const config = require('../config');
 const { logToDiscord } = require('../utils/discord');
+const PathSecurity = require('../utils/pathSecurity');
 
 const router = express.Router();
 const STATUS_DATA_PATH = path.join(process.cwd(), 'status-data.json');
@@ -12,7 +13,7 @@ const HISTORY_PATH = path.join(process.cwd(), 'status_history');
 
 router.get('/api/status/data', async (req, res) => {
     try {
-        const statusDataRaw = await fs.readFile(STATUS_DATA_PATH, 'utf-8');
+        const statusDataRaw = await PathSecurity.safeReadFile('status-data.json', process.cwd());
         const statusData = JSON.parse(statusDataRaw);
         res.json(statusData);
     } catch (error) {
@@ -33,7 +34,7 @@ router.post('/api/status/incidents', async (req, res) => {
     }
 
     try {
-        const statusDataRaw = await fs.promises.readFile(STATUS_DATA_PATH, 'utf-8');
+        const statusDataRaw = await PathSecurity.safeReadFile('status-data.json', process.cwd());
         const data = JSON.parse(statusDataRaw);
         const today = new Date().toISOString().split('T')[0];
 
@@ -51,62 +52,21 @@ router.post('/api/status/incidents', async (req, res) => {
 });
 
 router.get('/statystyki', (req, res) => {
-    const statsFilePath = path.join(process.cwd(), 'valorant_stats.html');
-    if (fs.existsSync(statsFilePath)) {
-        logToDiscord({
-            title: 'API Call Success: `/statystyki`',
-            color: 0x00FF00,
-            timestamp: new Date().toISOString(),
-            footer: { text: `IP: ${req.ip}` }
-        });
-        res.sendFile(statsFilePath);
-    } else {
-        logToDiscord({
-            title: 'API Call Failed: `/statystyki`',
-            color: 0xFFA500,
-            description: 'Stats file not found. It may be generating.',
-            timestamp: new Date().toISOString(),
-            footer: { text: `IP: ${req.ip}` }
-        }, true);
-        res.status(503).send('Statystyki są w trakcie generowania. Proszę odświeżyć stronę za chwilę.');
-    }
+    PathSecurity.safeSendFile(res, 'valorant_stats.html', process.cwd());
 });
 
 router.get('/challengetoradiant', (req, res) => {
-    const statsFilePath = path.join(process.cwd(), 'torad_valorant_stats.html');
-    if (fs.existsSync(statsFilePath)) {
-        logToDiscord({
-            title: 'API Call Success: `/challengetoradiant`',
-            color: 0x00FF00,
-            timestamp: new Date().toISOString(),
-            footer: { text: `IP: ${req.ip}` }
-        });
-        res.sendFile(statsFilePath);
-    } else {
-        logToDiscord({
-            title: 'API Call Failed: `/challengetoradiant`',
-            color: 0xFFA500,
-            description: 'Stats file not found. It may be generating.',
-            timestamp: new Date().toISOString(),
-            footer: { text: `IP: ${req.ip}` }
-        }, true);
-        res.status(503).send('Statystyki są w trakcie generowania. Proszę odświeżyć stronę za chwilę.');
-    }
+    PathSecurity.safeSendFile(res, 'torad_valorant_stats.html', process.cwd());
 });
 
 router.get('/display', (req, res) => {
-    const displayFilePath = path.join(process.cwd(), 'display.html');
-    if (fs.existsSync(displayFilePath)) {
-        res.sendFile(displayFilePath);
-    } else {
-        res.status(404).send('Błąd API. Skontaktuj się z administratorem!');
-    }
+    PathSecurity.safeSendFile(res, 'display.html', process.cwd());
 });
 
 router.get('/health', async (req, res) => {
     try {
-        const statsFileExists = fs.existsSync(path.join(process.cwd(), 'valorant_stats.html'));
-        const docsFileExists = fs.existsSync(path.join(process.cwd(), 'docs.html'));
+        const statsFileExists = fs.existsSync(PathSecurity.validateAndResolveStaticPath(process.cwd(), 'valorant_stats.html'));
+        const docsFileExists = fs.existsSync(PathSecurity.validateAndResolveStaticPath(process.cwd(), 'docs.html'));
         const apiStatus = await checkApiStatus();
 
         const uptimeSeconds = process.uptime();
@@ -157,26 +117,21 @@ router.get('/health', async (req, res) => {
 });
 
 router.get('/riot.txt', (req, res) => {
-    const riotFilePath = path.join(process.cwd(), 'riot.txt');
-    
-    if (fs.existsSync(riotFilePath)) {
-        res.setHeader('Content-Type', 'text/plain');
-        res.sendFile(riotFilePath);
-        log.info('RIOT_VERIFICATION', `Riot verification file accessed from ${req.ip}`);
-    } else {
-        log.error('RIOT_VERIFICATION', 'Riot.txt file not found');
-        res.status(404).send('Riot verification file not found');
-    }
+    PathSecurity.safeSendFile(res, 'riot.txt', process.cwd());
 });
 
 router.get('/api/status/details', async (req, res) => {
     const { date } = req.query;
-    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    if (!date || !PathSecurity.isValidDateString(date)) {
         return res.status(400).json({ error: 'Nieprawidłowy format daty. Oczekiwano YYYY-MM-DD.' });
     }
-    const filePath = path.join(HISTORY_PATH, `${date}.json`);
+    
+    if (!PathSecurity.isValidFileName(`${date}.json`)) {
+        return res.status(400).json({ error: 'Nieprawidłowa nazwa pliku.' });
+    }
+
     try {
-        const dayDataRaw = await fs.promises.readFile(filePath, 'utf-8');
+        const dayDataRaw = await PathSecurity.safeReadFile(`${date}.json`, HISTORY_PATH);
         res.setHeader('Content-Type', 'application/json');
         res.send(dayDataRaw);
     } catch (error) {
@@ -188,14 +143,14 @@ router.get('/api/status/details', async (req, res) => {
 router.get('/api/status', async (req, res) => {
     try {
         const apiStatus = await checkApiStatus();
-        const statsFileExists = fs.existsSync(path.join(process.cwd(), 'valorant_stats.html'));
+        const statsFileExists = fs.existsSync(PathSecurity.validateAndResolveStaticPath(process.cwd(), 'valorant_stats.html'));
 
         const automatedChecks = {
             henrik_api: { name: 'Zewnętrzne API (Henrik)', description: 'Kluczowe API dostarczające dane o grze.', status: apiStatus.reachable ? 'operational' : 'error' },
             stats_file: { name: 'Generator Statystyk', description: 'Proces generowania plików ze statystykami.', status: statsFileExists ? 'operational' : 'degraded' }
         };
         
-        const statusDataRaw = await fs.promises.readFile(STATUS_DATA_PATH, 'utf-8');
+        const statusDataRaw = await PathSecurity.safeReadFile('status-data.json', process.cwd());
         const incidentData = JSON.parse(statusDataRaw);
 
         const history = {};
@@ -204,10 +159,14 @@ router.get('/api/status', async (req, res) => {
             const date = new Date();
             date.setDate(today.getDate() - i);
             const dateString = date.toISOString().split('T')[0];
-            const filePath = path.join(HISTORY_PATH, `${dateString}.json`);
             
+            if (!PathSecurity.isValidFileName(`${dateString}.json`)) {
+                history[dateString] = 'no-data';
+                continue;
+            }
+
             try {
-                const dayDataRaw = await fs.promises.readFile(filePath, 'utf-8');
+                const dayDataRaw = await PathSecurity.safeReadFile(`${dateString}.json`, HISTORY_PATH);
                 const dayData = JSON.parse(dayDataRaw);
                 const statuses = Object.values(dayData).map(v => v.status);
                 
@@ -244,20 +203,15 @@ router.get('/api/status', async (req, res) => {
 });
 
 router.get('/', (req, res) => {
-    const docsFilePath = path.join(process.cwd(), 'docs.html');
-    res.sendFile(docsFilePath);
+    PathSecurity.safeSendFile(res, 'docs.html', process.cwd());
 });
 
 router.get('/status', (req, res) => {
-    const statusFilePath = path.join(process.cwd(), 'status_page', 'status.html');
-    if (fs.existsSync(statusFilePath)) res.sendFile(statusFilePath);
-    else res.status(404).send('Plik strony statusu nie został znaleziony.');
+    PathSecurity.safeSendFile(res, 'status_page/status.html', process.cwd());
 });
 
 router.get('/checks', (req, res) => {
-    const statusFilePath = path.join(process.cwd(), 'status_page', 'checks.html');
-    if (fs.existsSync(statusFilePath)) res.sendFile(statusFilePath);
-    else res.status(404).send('Plik strony statusu nie został znaleziony.');
+    PathSecurity.safeSendFile(res, 'status_page/checks.html', process.cwd());
 });
 
 module.exports = router;

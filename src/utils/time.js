@@ -135,5 +135,15 @@ module.exports = {
     formatMatchDateTime,
     formatMatchDateTimeShort,
     getTimeUntilMatch,
-    formatMatchDateTimeShortHour
+    formatMatchDateTimeShortHour,
+    // Exported for route-level filtering/comparisons
+    parseMatchDateTimeToUtc,
+    isMatchInFuture: (matchDate, matchTime) => {
+        try {
+            const start = parseMatchDateTimeToUtc(matchDate, matchTime);
+            return start.getTime() > Date.now();
+        } catch (e) {
+            return false;
+        }
+    }
 };

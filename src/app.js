@@ -12,10 +12,22 @@ const { logToDiscord } = require('./utils/discord');
 const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const session = require('express-session');
 
 const app = express();
 
-app.use(helmet({
+const adminHelmet = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+});
+
+const mainHelmet = helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -24,7 +36,15 @@ app.use(helmet({
       imgSrc: ["'self'", "data:", "https:"],
     },
   },
-}));
+});
+
+app.use((req, res, next) => {
+  if (req.path.startsWith('/admin')) {
+    adminHelmet(req, res, next);
+  } else {
+    mainHelmet(req, res, next);
+  }
+});
 
 const corsOptions = {
   origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:3000'],
@@ -56,6 +76,18 @@ const strictLimiter = rateLimit({
 });
 app.use('/rank/', strictLimiter);
 
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'default-session-secret-change-in-production',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000,
+        sameSite: 'strict'
+    }
+}));
+
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
@@ -64,7 +96,7 @@ app.set('views', path.join(__dirname, '..', 'views'));
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use(express.static(path.join(__dirname, '..', 'status_page')));
-app.use(express.static(path.join(__dirname, '..', 'admin')));
+app.use('/admin', express.static(path.join(__dirname, '..', 'admin')));
 
 app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
 
@@ -78,7 +110,7 @@ app.get('/health', (req, res) => {
   try {
     version = require('../../../package.json').version;
   } catch (error) {
-    version = '3.1.0-enhanced';
+    version = 'unknown';
   }
   
   const health = {

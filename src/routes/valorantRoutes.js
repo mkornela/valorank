@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { VALID_REGIONS, RANK_TIERS, TEAMS, EVENTS, RANK_ELO_THRESHOLDS } = require('../constants');
 const { logToDiscord } = require('../utils/discord');
-const { getSessionTimeRange, formatMatchDateTimeShort, getTimeUntilMatch, formatMatchDateTimeShortHour } = require('../utils/time');
+const { getSessionTimeRange, formatMatchDateTimeShort, getTimeUntilMatch, formatMatchDateTimeShortHour, isMatchInFuture, parseMatchDateTimeToUtc } = require('../utils/time');
 const { fetchAccountDetails, fetchMatchHistory, fetchPlayerMMR, fetchLeaderboard, fetchMMRHistory, fetchMMRHistoryDaily } = require('../services/api');
 const { findPlayerByRank } = require('../data/leaderboard');
 const { calculateRRToGoal, calculateSessionStats } = require('../services/game');
@@ -187,6 +187,7 @@ router.get('/rank/:name/:tag/:region', validateRegion, asyncHandler(async (req, 
     }
 
     set(cacheKey, finalText, 60);
+    console.log(finalText)
     
     sendSuccessResponse(res, finalText, {
         title: 'API Call Success: `/rank` (extended)',
@@ -361,9 +362,21 @@ router.get('/getrank/:position', validatePosition, asyncHandler(async (req, res,
 router.get('/nextmatch/:event', asyncHandler(async (req, res, next) => {
     const { event } = req.params;
     const matches = await getUpcomingMatches();
-    const nextMatch = matches.data.find(match => 
-        match.event.name.toLowerCase() === event.toLowerCase()
-    );
+
+    // Filter: matching event name AND strictly future start time
+    const matching = (matches.data || [])
+        .filter(match => match?.event?.name && match?.date && match?.time)
+        .filter(match => match.event.name.toLowerCase() === event.toLowerCase())
+        .filter(match => isMatchInFuture(match.date, match.time));
+
+    // Pick earliest upcoming by parsed start time
+    matching.sort((a, b) => {
+        const aTime = parseMatchDateTimeToUtc(a.date, a.time).getTime();
+        const bTime = parseMatchDateTimeToUtc(b.date, b.time).getTime();
+        return aTime - bTime;
+    });
+
+    const nextMatch = matching[0];
     if (!nextMatch) {
         const result = `Nie znaleziono nadchodzących meczy dla wydarzenia: "${event}". Sprawdź, czy nazwa jest poprawna.`;
         sendInfoResponse(res, result, {
@@ -449,7 +462,7 @@ router.get('/dailymatches/:event', asyncHandler(async (req, res, next) => {
     });
 }));
 
-// Enhanced VLR Endpoints
+
 router.get('/vlr/match-details/:url', asyncHandler(async (req, res, next) => {
     const { url } = req.params;
     const fullUrl = decodeURIComponent(url);
@@ -519,6 +532,32 @@ router.get('/vlr/search-players/:query', asyncHandler(async (req, res, next) => 
         ],
         ip: req.ip
     });
+}));
+
+router.get('/statystyki', asyncHandler(async (req, res, next) => {
+    const { startDate, endDate } = req.query;
+    // Replace with your main player info
+    const { STATS_PLAYER_NAME, STATS_PLAYER_TAG, STATS_PLAYER_REGION } = require('../config');
+    const allMatchesResp = await fetchMatchHistory(STATS_PLAYER_NAME, STATS_PLAYER_TAG, STATS_PLAYER_REGION, 'competitive', 100);
+    let filteredMatches = allMatchesResp.data;
+    if (startDate || endDate) {
+        filteredMatches = filteredMatches.filter(match => {
+            const matchDate = new Date(match.meta?.date);
+            if (startDate && matchDate < new Date(startDate)) return false;
+            if (endDate && matchDate > new Date(endDate)) return false;
+            return true;
+        });
+    }
+    // Aggregate stats for filtered matches
+    const stats = filteredMatches.reduce((acc, match) => {
+        acc.matches++;
+        acc.wins += match.result === 'win' ? 1 : 0;
+        acc.losses += match.result === 'loss' ? 1 : 0;
+        acc.kills += match.stats?.kills || 0;
+        acc.deaths += match.stats?.deaths || 0;
+        return acc;
+    }, { matches: 0, wins: 0, losses: 0, kills: 0, deaths: 0 });
+    res.json({ success: true, stats, matches: filteredMatches });
 }));
 
 module.exports = router;

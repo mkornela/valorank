@@ -5,20 +5,21 @@ const log = require('../utils/logger');
 
 const router = express.Router();
 
-router.get('/', (req, res) => {
+router.get('/', requireAdminAuth, (req, res) => {
     res.json({ 
         message: 'Admin panel is working!', 
         timestamp: new Date().toISOString(),
         routes: [
             'GET /admin/logs - Logs viewer page',
-            'POST /admin/login - Login endpoint',
             'GET /admin/logs/stream - Real-time logs stream',
+            'GET /admin/logs/api - Logs API endpoint',
+            'DELETE /admin/logs - Clear logs',
             'GET /admin/test - Test endpoint'
         ]
     });
 });
 
-router.get('/test', (req, res) => {
+router.get('/test', requireAdminAuth, (req, res) => {
     log.info('ADMIN', `Admin test endpoint accessed from IP: ${req.ip}`);
     res.json({ 
         success: true, 
@@ -28,98 +29,38 @@ router.get('/test', (req, res) => {
 });
 
 function requireAdminAuth(req, res, next) {
-    const { username, password } = req.body || {};
-    
-    const adminUsername = process.env.ADMIN_USERNAME;
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    
-    if (username === adminUsername && password === adminPassword) {
-        next();
-    } else {
-        log.warn('ADMIN', `Failed login attempt from IP: ${req.ip}, username: ${username}`);
-        res.status(401).json({ error: 'Nieprawidłowe dane autoryzacyjne' });
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Basic ')) {
+        const credentials = Buffer.from(authHeader.slice(6), 'base64').toString('utf-8');
+        const [username, password] = credentials.split(':');
+        
+        const adminUsername = process.env.ADMIN_USERNAME;
+        const adminPassword = process.env.ADMIN_PASSWORD;
+        
+        if (username === adminUsername && password === adminPassword) {
+            return next();
+        }
     }
+    
+    log.warn('ADMIN', `Failed admin access attempt from IP: ${req.ip}`);
+    res.setHeader('WWW-Authenticate', 'Basic realm="Valorank Admin"');
+    res.status(401).json({ error: 'Authentication required' });
 }
 
-router.post('/login', requireAdminAuth, (req, res) => {
-    const { username } = req.body;
-    
-    log.info('ADMIN', `Administrator ${username} logged in from IP: ${req.ip}`);
-    
-    res.json({ 
-        success: true, 
-        message: 'Zalogowano pomyślnie',
-        timestamp: new Date().toISOString()
-    });
-});
-
-router.get('/logs', (req, res) => {
-    const logsPagePath = path.join(__dirname, '..', 'admin', 'logs.html');
+router.get('/logs', requireAdminAuth, (req, res) => {
+    const logsPagePath = path.join(__dirname, '..', '..', 'admin', 'index.html');
     
     if (fs.existsSync(logsPagePath)) {
         res.sendFile(logsPagePath);
     } else {
-        res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Admin Logs - Setup Required</title>
-                <style>
-                    body { font-family: Arial, sans-serif; padding: 40px; background: #1a1a1a; color: #fff; }
-                    .container { max-width: 800px; margin: 0 auto; }
-                    .error { background: #ff4444; padding: 20px; border-radius: 8px; margin: 20px 0; }
-                    .info { background: #4444ff; padding: 20px; border-radius: 8px; margin: 20px 0; }
-                    code { background: #333; padding: 2px 6px; border-radius: 4px; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <h1>🔧 Admin Panel - Setup Required</h1>
-                    
-                    <div class="error">
-                        <h3>❌ Logs page not found</h3>
-                        <p>File <code>admin/logs.html</code> doesn't exist.</p>
-                    </div>
-                    
-                    <div class="info">
-                        <h3>📁 Required folder structure:</h3>
-                        <pre>
-your-project/
-├── admin/
-│   └── logs.html  ← Create this file
-├── routes/
-│   └── adminRoutes.js  ← This file exists ✓
-└── utils/
-    └── logger.js  ← Update this file
-                        </pre>
-                    </div>
-                    
-                    <div class="info">
-                        <h3>🚀 Quick Setup:</h3>
-                        <ol>
-                            <li>Create folder <code>admin/</code> in your project root</li>
-                            <li>Create <code>admin/logs.html</code> with the logs viewer page</li>
-                            <li>Update <code>utils/logger.js</code> with the enhanced logger</li>
-                            <li>Add to <code>.env</code>:
-                                <br><code>ADMIN_USERNAME=your_username</code>
-                                <br><code>ADMIN_PASSWORD=your_password</code>
-                            </li>
-                        </ol>
-                    </div>
-                    
-                    <p><a href="/admin/test" style="color: #4AF;">Test admin routes</a></p>
-                    <p><a href="/" style="color: #4AF;">← Back to main page</a></p>
-                </div>
-            </body>
-            </html>
-        `);
+        res.status(404).json({ error: 'Admin panel not found' });
     }
 });
 
-router.get('/logs/stream', (req, res) => {
+router.get('/logs/stream', requireAdminAuth, (req, res) => {
     if (typeof log.getAllLogs !== 'function') {
-        return res.status(500).json({ 
-            error: 'Logger not properly configured. Please update utils/logger.js' 
+        return res.status(500).json({
+            error: 'Logger not properly configured. Please update utils/logger.js'
         });
     }
 
@@ -164,24 +105,77 @@ router.get('/logs/stream', (req, res) => {
     log.info('ADMIN', `Administrator connected to logs stream (IP: ${req.ip})`);
 });
 
-router.get('/logs/api', (req, res) => {
+router.get('/logs/api', requireAdminAuth, (req, res) => {
     try {
         if (typeof log.getAllLogs !== 'function') {
-            return res.status(500).json({ 
-                error: 'Logger not properly configured. Please update utils/logger.js' 
+            return res.status(500).json({
+                error: 'Logger not properly configured. Please update utils/logger.js'
             });
         }
 
-        const logs = log.getAllLogs();
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const filter = req.query.filter || 'all';
+        const search = req.query.search || '';
+        const sortField = req.query.sort || 'timestamp';
+        const sortOrder = req.query.order || 'desc';
+
+        let logs = log.getAllLogs();
+
+        if (filter !== 'all') {
+            logs = logs.filter(log => log.level === filter);
+        }
+
+        if (search) {
+            const searchLower = search.toLowerCase();
+            logs = logs.filter(log => 
+                log.message.toLowerCase().includes(searchLower) ||
+                log.module.toLowerCase().includes(searchLower) ||
+                (log.id && log.id.toString().includes(searchLower)) ||
+                JSON.stringify(log.meta).toLowerCase().includes(searchLower)
+            );
+        }
+
+        logs.sort((a, b) => {
+            let aValue = a[sortField];
+            let bValue = b[sortField];
+
+            if (sortField === 'timestamp') {
+                aValue = new Date(aValue).getTime();
+                bValue = new Date(bValue).getTime();
+            }
+
+            if (typeof aValue === 'string') {
+                aValue = aValue.toLowerCase();
+                bValue = bValue.toLowerCase();
+            }
+
+            if (sortOrder === 'asc') {
+                return aValue > bValue ? 1 : -1;
+            } else {
+                return aValue < bValue ? 1 : -1;
+            }
+        });
+
+        const total = logs.length;
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const paginatedLogs = logs.slice(startIndex, endIndex);
+
         const stats = typeof log.getStats === 'function' ? log.getStats() : {
-            total: logs.length,
-            info: 0,
-            warn: 0,
-            error: 0
+            total: total,
+            info: logs.filter(l => l.level === 'info').length,
+            warn: logs.filter(l => l.level === 'warn').length,
+            error: logs.filter(l => l.level === 'error').length,
+            debug: logs.filter(l => l.level === 'debug').length
         };
 
         res.json({
-            logs: logs.slice(0, 100),
+            logs: paginatedLogs,
+            total: total,
+            page: page,
+            limit: limit,
+            totalPages: Math.ceil(total / limit),
             stats: stats,
             timestamp: new Date().toISOString()
         });
@@ -192,7 +186,7 @@ router.get('/logs/api', (req, res) => {
     }
 });
 
-router.delete('/logs', (req, res) => {
+router.delete('/logs', requireAdminAuth, (req, res) => {
     try {
         if (typeof log.clearLogs === 'function') {
             log.clearLogs();

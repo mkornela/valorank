@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Valorank Admin Panel</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --accent-color: #3b82f6;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --success-color: #10b981;
+            --dark-bg: #0f172a;
+            --darker-bg: #020617;
+            --card-bg: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--dark-bg) 0%, var(--darker-bg) 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-info {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .info { color: var(--accent-color); }
+        .warn { color: var(--warning-color); }
+        .error { color: var(--danger-color); }
+        .success { color: var(--success-color); }
+
+        .logs-container {
+            background: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .logs-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .logs-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .filter-select, .search-input {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--dark-bg);
+            color: var(--text-primary);
+            outline: none;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary-color);
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--secondary-color);
+        }
+
+        .btn-danger {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .logs-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .logs-table th,
+        .logs-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logs-table th {
+            background: var(--dark-bg);
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .logs-table th:hover {
+            background: var(--border-color);
+        }
+
+        .logs-table tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .log-level {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .level-info { background: rgba(59, 130, 246, 0.2); color: var(--accent-color); }
+        .level-warn { background: rgba(245, 158, 11, 0.2); color: var(--warning-color); }
+        .level-error { background: rgba(239, 68, 68, 0.2); color: var(--danger-color); }
+        .level-debug { background: rgba(156, 163, 175, 0.2); color: var(--text-secondary); }
+
+        .log-message {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .log-details {
+            display: none;
+            background: var(--dark-bg);
+            padding: 1rem;
+            border-radius: 6px;
+            margin-top: 0.5rem;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .log-row.expanded .log-details {
+            display: block;
+        }
+
+        .json-view {
+            background: var(--darker-bg);
+            padding: 1rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            padding: 1.5rem;
+            gap: 0.5rem;
+        }
+
+        .page-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-primary);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .page-btn:hover {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .page-btn.active {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .refresh-indicator {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--text-secondary);
+            border-top: 2px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .logs-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .logs-table {
+                font-size: 0.9rem;
+            }
+            
+            .logs-table th,
+            .logs-table td {
+                padding: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Valorank Admin Panel</h1>
+            <p>Comprehensive logging and system monitoring</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="total-logs">0</div>
+                <div class="stat-info">Total Log Entries</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number info" id="info-logs">0</div>
+                <div class="stat-info">Info Logs</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number warn" id="warn-logs">0</div>
+                <div class="stat-info">Warning Logs</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number error" id="error-logs">0</div>
+                <div class="stat-info">Error Logs</div>
+            </div>
+        </div>
+
+        <div class="logs-container">
+            <div class="logs-header">
+                <h2>System Logs</h2>
+                <div class="controls">
+                    <select class="filter-select" id="level-filter">
+                        <option value="all">All Levels</option>
+                        <option value="info">Info</option>
+                        <option value="warn">Warning</option>
+                        <option value="error">Error</option>
+                        <option value="debug">Debug</option>
+                    </select>
+                    <input type="text" class="search-input" id="search-input" placeholder="Search logs...">
+                    <button class="btn btn-primary" id="refresh-btn">
+                        <span class="refresh-indicator" id="refresh-indicator"></span>
+                        Refresh
+                    </button>
+                    <button class="btn btn-danger" id="clear-btn">Clear Logs</button>
+                </div>
+            </div>
+
+            <div class="logs-content">
+                <table class="logs-table">
+                    <thead>
+                        <tr>
+                            <th data-sort="timestamp">Timestamp</th>
+                            <th data-sort="level">Level</th>
+                            <th data-sort="module">Module</th>
+                            <th data-sort="message">Message</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs-body">
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 2rem;">
+                                Loading logs...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="pagination">
+                <button class="page-btn" id="prev-btn">Previous</button>
+                <span id="page-info">Page 1 of 1</span>
+                <button class="page-btn" id="next-btn">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        let totalPages = 1;
+        let currentFilter = 'all';
+        let currentSearch = '';
+        let currentSort = { field: 'timestamp', direction: 'desc' };
+        let allLogs = [];
+        let credentials = '';
+
+        const API_BASE = '/admin/logs/api';
+        const LOGS_PER_PAGE = 50;
+
+        // Check if credentials are stored in localStorage
+        function checkAuth() {
+            const storedCredentials = localStorage.getItem('adminCredentials');
+            if (storedCredentials) {
+                credentials = storedCredentials;
+                return true;
+            }
+            return false;
+        }
+
+        // Show login prompt
+        function showLoginPrompt() {
+            const username = prompt("Admin Username:");
+            if (username === null) return false;
+            
+            const password = prompt("Admin Password:");
+            if (password === null) return false;
+            
+            credentials = btoa(`${username}:${password}`);
+            localStorage.setItem('adminCredentials', credentials);
+            return true;
+        }
+
+        // Initialize authentication
+        function initAuth() {
+            if (!checkAuth()) {
+                if (!showLoginPrompt()) {
+                    alert("Authentication required to access admin panel");
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // Execute authentication on page load
+        if (!initAuth()) {
+            document.body.innerHTML = '<div style="text-align: center; margin-top: 100px;"><h1>Authentication Required</h1><button onclick="initAuth() && location.reload()">Login</button></div>';
+        }
+
+        async function fetchLogs() {
+            try {
+                showLoading();
+                const response = await fetch(`${API_BASE}?page=${currentPage}&limit=${LOGS_PER_PAGE}&filter=${currentFilter}&search=${encodeURIComponent(currentSearch)}&sort=${currentSort.field}&order=${currentSort.direction}`, {
+                    headers: {
+                        'Authorization': `Basic ${credentials}`
+                    }
+                });
+                
+                if (response.status === 401) {
+                    localStorage.removeItem('adminCredentials');
+                    alert('Authentication failed. Please login again.');
+                    if (initAuth()) {
+                        window.location.reload();
+                    }
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch logs');
+                }
+
+                const data = await response.json();
+                allLogs = data.logs;
+                totalPages = Math.ceil(data.total / LOGS_PER_PAGE);
+                
+                updateStats(data.stats);
+                renderLogs();
+                updatePagination();
+                hideLoading();
+            } catch (error) {
+                console.error('Error fetching logs:', error);
+                hideLoading();
+            }
+        }
+
+        function showLoading() {
+            document.getElementById('refresh-indicator').style.display = 'inline-block';
+        }
+
+        function hideLoading() {
+            document.getElementById('refresh-indicator').style.display = 'none';
+        }
+
+        function updateStats(stats) {
+            document.getElementById('total-logs').textContent = stats.total.toLocaleString();
+            document.getElementById('info-logs').textContent = stats.info.toLocaleString();
+            document.getElementById('warn-logs').textContent = stats.warn.toLocaleString();
+            document.getElementById('error-logs').textContent = stats.error.toLocaleString();
+        }
+
+        function renderLogs() {
+            const tbody = document.getElementById('logs-body');
+            tbody.innerHTML = '';
+
+            if (allLogs.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 2rem;">
+                            No logs found
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            allLogs.forEach(log => {
+                const row = document.createElement('tr');
+                row.className = 'log-row';
+                row.innerHTML = `
+                    <td>${formatDateTime(log.timestamp)}</td>
+                    <td><span class="log-level level-${log.level}">${log.level.toUpperCase()}</span></td>
+                    <td>${log.module}</td>
+                    <td class="log-message" title="${escapeHtml(log.message)}">${escapeHtml(log.message)}</td>
+                    <td>
+                        <button class="btn btn-primary view-details" data-id="${log.id}">Details</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            document.querySelectorAll('.view-details').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const logId = e.target.dataset.id;
+                    const log = allLogs.find(l => l.id === logId);
+                    if (log) {
+                        showLogDetails(log);
+                    }
+                });
+            });
+        }
+
+        function showLogDetails(log) {
+            const existingModal = document.getElementById('log-details-modal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+
+            const modal = document.createElement('div');
+            modal.id = 'log-details-modal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 1000;
+            `;
+
+            modal.innerHTML = `
+                <div style="
+                    background: var(--card-bg);
+                    padding: 2rem;
+                    border-radius: 12px;
+                    max-width: 90%;
+                    max-height: 90%;
+                    overflow: auto;
+                    border: 1px solid var(--border-color);
+                ">
+                    <h3 style="margin-bottom: 1rem;">Log Details</h3>
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Timestamp:</strong> ${formatDateTime(log.timestamp)}<br>
+                        <strong>Level:</strong> <span class="log-level level-${log.level}">${log.level.toUpperCase()}</span><br>
+                        <strong>Module:</strong> ${log.module}<br>
+                        <strong>Message:</strong> ${escapeHtml(log.message)}
+                    </div>
+                    <div class="json-view">
+                        ${JSON.stringify(log.meta, null, 2)}
+                    </div>
+                    <div style="margin-top: 1rem; text-align: right;">
+                        <button class="btn btn-primary" id="close-modal">Close</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            document.getElementById('close-modal').addEventListener('click', () => {
+                modal.remove();
+            });
+        }
+
+        function formatDateTime(timestamp) {
+            return new Date(timestamp).toLocaleString();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function updatePagination() {
+            const pagination = document.getElementById('pagination');
+            const pageInfo = document.getElementById('page-info');
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+
+            pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+            prevBtn.disabled = currentPage === 1;
+            nextBtn.disabled = currentPage === totalPages;
+        }
+
+        document.getElementById('refresh-btn').addEventListener('click', () => {
+            currentPage = 1;
+            fetchLogs();
+        });
+
+        document.getElementById('clear-btn').addEventListener('click', async () => {
+            if (confirm('Are you sure you want to clear all logs?')) {
+                try {
+                    const response = await fetch('/admin/logs', {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `Basic ${credentials}`
+                        }
+                    });
+                    if (response.ok) {
+                        fetchLogs();
+                    }
+                } catch (error) {
+                    console.error('Error clearing logs:', error);
+                }
+            }
+        });
+
+        document.getElementById('level-filter').addEventListener('change', (e) => {
+            currentFilter = e.target.value;
+            currentPage = 1;
+            fetchLogs();
+        });
+
+        document.getElementById('search-input').addEventListener('input', debounce((e) => {
+            currentSearch = e.target.value;
+            currentPage = 1;
+            fetchLogs();
+        }, 300));
+
+        document.querySelectorAll('th[data-sort]').forEach(th => {
+            th.addEventListener('click', () => {
+                const field = th.dataset.sort;
+                if (currentSort.field === field) {
+                    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentSort.field = field;
+                    currentSort.direction = 'desc';
+                }
+                fetchLogs();
+            });
+        });
+
+        document.getElementById('prev-btn').addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                fetchLogs();
+            }
+        });
+
+        document.getElementById('next-btn').addEventListener('click', () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                fetchLogs();
+            }
+        });
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        fetchLogs();
+        setInterval(fetchLogs, 10000);
+    </script>
+</body>
+</html>
