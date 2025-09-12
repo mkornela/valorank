@@ -12,9 +12,14 @@ const sendSuccessResponse = (res, data, discordConfig = null) => {
             footer: { text: `IP: ${discordConfig.ip || 'unknown'}` }
         }, false, logEntry);
     }
-    // Normalize output: always { success: true, data, timestamp }
+    // If a route passes a plain string, return it as text
+    if (typeof data === 'string') {
+        console.log('sendSuccessResponse (text)', data);
+        return res.type('text/plain').send(data);
+    }
+
+    // Normalize output for non-string payloads
     const normalize = (payload) => {
-        // If payload already follows our shape, return as-is
         if (payload && typeof payload === 'object' && ('success' in payload || 'data' in payload)) {
             return payload;
         }
@@ -27,7 +32,7 @@ const sendSuccessResponse = (res, data, discordConfig = null) => {
         timestamp: new Date().toISOString()
     };
 
-    console.log('sendSuccessResponse', body);
+    console.log('sendSuccessResponse (json)', body);
     res.json(body);
 };
 
