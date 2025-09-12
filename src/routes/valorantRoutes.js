@@ -393,7 +393,7 @@ router.get('/nextmatch/:event', asyncHandler(async (req, res, next) => {
     const date = formatMatchDateTimeShort(nextMatch.date, nextMatch.time);
     const timeUntil = getTimeUntilMatch(nextMatch.date, nextMatch.time);
 
-    const result = `Następny mecz na "${event}" to: ${nextMatch.teams[0].name} vs ${nextMatch.teams[1].name} za ${timeUntil} (${date})`;
+    const result = `${nextMatch.teams[0].name} vs ${nextMatch.teams[1].name} za ${timeUntil} (${date})`;
 
     sendSuccessResponse(res, result, {
         title: 'API Call Success: `/nextmatch`',
